@@ -1,3 +1,6 @@
+**WARNING: the following instructions are the one that were distribuited with the code, I will update them as soon as I have time since in my opinion they are not very precise.  You must follow the instruction in the haptic documentation first (having the right files under /etc/Haption/). Documentation and files are [here](https://drive.google.com/drive/folders/1g4NHb75PtUcHunHAImuzkCfoDhdFXWoR?usp=drive_link). I uploaded the binaries in the correct folder so you do not need to follow point #1. Also you can avoid points #0 and #4 by running the 'entrypoint.sh'**
+
+   
 This project includes a basic implementation of the test programs (TestCalibration, TestImpedance and TestAdmittance) using ROS2 and RaptorAPI.
 This guide is written for Linux, Windows users need to adapt it in the appropriate way.
 
@@ -12,7 +15,7 @@ If you want to follow the ros2 way for creating a workspace, you can clone this 
 ## Usage
 0. For newbies: run "local_setup.bash" first! (typically under "/opt/ros/<version>")
 1. Copy the RaptorAPI shared libraries to "src/haption_raptor_api/Dependencies/RaptorAPI/bin/Linux/glibc-<version>"
-2. Make sure that the ".param" file for your device is accessible
+2. Make sure that the ".param" file for your device is accessible under /etc/Haption/Connector
 3. Prepare the raptor_api_interfaces:
  colcon build --packages-select raptor_api_interfaces
 4. Set LD_LIBRARY_PATH so that it points to "src/haption_raptor_api/Dependencies/RaptorAPI/bin/Linux/glibc-<version>"
