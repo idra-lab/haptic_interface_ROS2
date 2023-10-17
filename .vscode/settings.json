@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "memory": "cpp",
+        "typeindex": "cpp",
+        "typeinfo": "cpp",
+        "chrono": "cpp",
+        "ostream": "cpp",
+        "__node_handle": "cpp",
+        "complex": "cpp"
+    }
+}
