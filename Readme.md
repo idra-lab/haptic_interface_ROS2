@@ -38,20 +38,29 @@ If you want to follow the ros2 way for creating a workspace, you can clone this 
     - Edit the test_calibration/parameters.yaml according to your network setup
     - Run the calibration node by calling 
         ```bash
-        ./start_TestCalibration
+        ./start_TestCalibration.sh
         ```
 8. Run the impedance node:
     - Edit the test_impedance/parameters.yaml according to your network setup
     - Run 
         ```bash
-        ./start_TestImpedance
+        ./start_TestImpedance.sh
         ```
 9. Or run the admittance node:
     - Edit the test_admittance/parameters.yaml according to your network setup
     - Run 
         ```bash
-        ./start_TestAdmittance
+        ./start_TestAdmittance.sh
         ```
+## Robot teleoperation
+The haptic interface can be used to command a target pose and the resulting force measured by the robot can be
+exerted by the haptic interface through the `haptic_control` node. Also a safe XYZ cartesian position zone limit is implemented. Limits can be changes modifyng the parameters in `haptic_control/parameters.yaml`.
+Finally run
+```bash
+./haptic_control.sh
+```
+
+
     
     
     
