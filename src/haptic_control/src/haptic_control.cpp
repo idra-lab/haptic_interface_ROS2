@@ -1,5 +1,6 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -36,7 +37,8 @@ class HapticControl : public rclcpp::Node {
                .allow_undeclared_parameters(true)
                .automatically_declare_parameters_from_overrides(true)))
       : Node(name, namespace_, options) {
-    // safety XYZ position zone -> default
+    
+    // safety XYZ position zone
     this->declare_parameter("min_x", -1.0);
     this->max_x = this->get_parameter("min_x").as_double();
     this->declare_parameter("max_x", 1.0);
@@ -49,14 +51,7 @@ class HapticControl : public rclcpp::Node {
     this->max_z = this->get_parameter("min_z").as_double();
     this->declare_parameter("max_z", 1.0);
     this->max_z = this->get_parameter("max_z").as_double();
-    // safety XYZ position zone -> read from config file
-    this->get_parameter("min_x", min_x);
-    this->get_parameter("max_x", max_x);
-    this->get_parameter("min_y", min_y);
-    this->get_parameter("max_y", max_y);
-    this->get_parameter("min_z", min_z);
-    this->get_parameter("max_z", max_z);
-
+    
     this->get_parameter("max_force", max_force);
 
     // init wrench msg
@@ -68,7 +63,6 @@ class HapticControl : public rclcpp::Node {
     current_wrench.wrench.torque.y = 0.0;
     current_wrench.wrench.torque.z = 0.0;
 
-    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preparing publishers");
     _out_virtuose_status = this->create_subscription<
         raptor_api_interfaces::msg::OutVirtuoseStatus>(
         "out_virtuose_status", 1,
@@ -85,23 +79,20 @@ class HapticControl : public rclcpp::Node {
     _target_pos_publisher =
         this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                                 1);
+    // just for visualisation purpose
     current_target_pos_publisher =
         this->create_publisher<geometry_msgs::msg::PoseStamped>(
             "/current_frame", 1);
 
-    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preparing subscriptions");
     _in_virtuose_force =
         this->create_publisher<raptor_api_interfaces::msg::InVirtuoseForce>(
             "in_virtuose_force", 1);
+    
     // create force/wrench subscriber
     subscriber = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
         "/bus0/ft_sensor0/ft_sensor_readings/wrench", 1,
         std::bind(&HapticControl::SetWrenchCB, this, _1));
-    // subscriber =
-    // this->create_subscription<geometry_msgs::msg::WrenchStamped>("/ft_sensor_wrench",
-    // 1, std::bind(&HapticControl::SetWrenchCB, this, _1));
 
-    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preparing services");
     client = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
         "virtuose_impedance");
 
@@ -129,8 +120,6 @@ class HapticControl : public rclcpp::Node {
     current_wrench.wrench.torque.x = target_wrench.wrench.torque.y;
     current_wrench.wrench.torque.y = target_wrench.wrench.torque.x;
     current_wrench.wrench.torque.z = -target_wrench.wrench.torque.z;
-    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current force is: %f",
-    // current_wrench.wrench.force.z);
   }
   // Callback for topic out_virtuose_pose
   void out_virtuose_poseCB(
@@ -162,11 +151,6 @@ class HapticControl : public rclcpp::Node {
     cur_pose[4] = msg->virtuose_pose.rotation.y;
     cur_pose[5] = msg->virtuose_pose.rotation.z;
     cur_pose[6] = msg->virtuose_pose.rotation.w;
-    // if (ctr % 1000 == 0)
-    // {
-    // printf("Virtuose pose: %f %f %f %f %f %f %f\n", cur_pose[0], cur_pose[1],
-    // cur_pose[2], cur_pose[3], cur_pose[4], cur_pose[5], cur_pose[6]);
-    // }
   }
 
   // Callback for topic out_virtuose_status
@@ -253,26 +237,11 @@ class HapticControl : public rclcpp::Node {
 
     ctr = 0;
 
-    // Wait for first pose of device and fill starting pose
-    // while (!received_haptic_pose)
-    // {
-    //   received_haptic_pose =
-    //   rclcpp::wait_for_message(haptic_starting_position,
-    //   this->shared_from_this(), "/out_virtuose_pose",
-    //   std::chrono::seconds(1)); RCLCPP_INFO(this->get_logger(), "still
-    //   waiting for haptic device position");
-    // }
-    // RCLCPP_INFO(this->get_logger(), "Haptic Device pose received \nHaptic
-    // starting position is : x: %f | y: %f | z: %f",
-    //             haptic_starting_position.pose.position.x,
-    //             haptic_starting_position.pose.position.y,
-    //             haptic_starting_position.pose.position.z);
-
-
     // Perform impedance loop at 1000 Hz
     impedanceThread = this->create_wall_timer(
         1ms, std::bind(&HapticControl::ImpedanceThread, this));
-    RCLCPP_INFO(this->get_logger(), "\033[0;32mImpedance thread started\033[0m");
+    RCLCPP_INFO(this->get_logger(),
+                "\033[0;32mImpedance thread started\033[0m");
   }
 
   void ImpedanceThread() {
@@ -375,16 +344,10 @@ class HapticControl : public rclcpp::Node {
     // // apply rotation matrix difference to target rotation matrix
     // Eigen::Matrix3d rTarget = rEEStart * rDiff;
 
-    // transform back to quaternion
     current_pose.header.frame_id = "base_link";
     current_pose.pose.position.x = target_pose.pose.position.x;
     current_pose.pose.position.y = target_pose.pose.position.y;
     current_pose.pose.position.z = target_pose.pose.position.z;
-
-    // SAFE ZONE POSITION
-    current_pose.pose.position.x = std::clamp(current_pose.pose.position.x, min_x, max_x);
-    current_pose.pose.position.y = std::clamp(current_pose.pose.position.y, min_y, max_y);
-    current_pose.pose.position.z = std::clamp(current_pose.pose.position.z, min_z, max_z);
 
     Eigen::Quaterniond qRotX(0.0, 1.0, 0.0, 0.0);
     Eigen::Quaterniond qRotY(0.70710678118, 0.0, 0, 0.70710678118);
@@ -419,18 +382,23 @@ class HapticControl : public rclcpp::Node {
     target_pose.pose.orientation.z = qTarget.z();
     target_pose.pose.orientation.w = qTarget.w();
 
+    // SAFE ZONE POSITION
+    target_pose.pose.position.x =
+        std::clamp(target_pose.pose.position.x, min_x, max_x);
+    target_pose.pose.position.y =
+        std::clamp(target_pose.pose.position.y, min_y, max_y);
+    target_pose.pose.position.z =
+        std::clamp(target_pose.pose.position.z, min_z, max_z);
+
     // publish
     _target_pos_publisher->publish(target_pose);
 
-
     // Print status every second
     if (ctr % 100 == 0) {
-      std::cout << "Force: " << force.virtuose_force.force.x << " "
-                << force.virtuose_force.force.y << " "
-                << force.virtuose_force.force.z << " "
-                << force.virtuose_force.torque.x << " "
-                << force.virtuose_force.torque.y << " "
-                << force.virtuose_force.torque.z << " " << std::endl;
+      RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+                  "Target position: x: %f | y: %f | z: %f ",
+                  target_pose.pose.position.x, target_pose.pose.position.y,
+                  target_pose.pose.position.z);
     }
   }
 
