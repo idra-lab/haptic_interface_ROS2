@@ -105,7 +105,7 @@ def generate_launch_description():
 
     # CALIBRATION NODE
     haptic_calibration_node = TimerAction(
-        period = 4.0,
+        period = 3.0,
         actions = [Node(
         package="test_calibration",
         executable="test_calibration",
@@ -117,11 +117,12 @@ def generate_launch_description():
     haptic_parameters_control = haption_ws_path + "src/haptic_control/parameters.yaml"
 
     haptic_control_node = TimerAction(
-        period=10.0,
+        period=6.0,
         actions=[
             Node(
                 package="haptic_control",
                 executable="haptic_control",
+                remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
                     ParameterFile(haptic_parameters_control)
                 ]
