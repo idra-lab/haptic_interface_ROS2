@@ -17,6 +17,8 @@
 #include "raptor_api_interfaces/msg/out_virtuose_status.hpp"
 #include "raptor_api_interfaces/srv/virtuose_impedance.hpp"
 #include "raptor_api_interfaces/srv/virtuose_reset.hpp"
+
+#include "rclcpp/parameter_event_handler.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/wait_for_message.hpp"
 
@@ -38,8 +40,11 @@ public:
                  .automatically_declare_parameters_from_overrides(true)))
         : Node(name, namespace_, options)
     {
+
+        this->declare_parameter("scaling_factor", 1.0);
+        this->declare_parameter("bunding_box", 0);
         // safety XYZ position zone -> default
-        this->use_limits = this->get_parameter("use_limits").as_bool(); 
+        this->use_limits = this->get_parameter("use_limits").as_bool();
         // this->declare_parameter("min_x", -1.0);
         this->min_x = this->get_parameter("min_x").as_double();
         // this->declare_parameter("max_x", 1.0);
@@ -54,6 +59,9 @@ public:
         this->max_z = this->get_parameter("max_z").as_double();
         // safety XYZ position zone -> read from config file
         this->get_parameter("max_force", max_force);
+
+        // Create a parameter subscriber that can be used to monitor parameter changes
+        param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
 
         // init wrench msg
         current_wrench.header.frame_id = "base_link";
@@ -91,17 +99,43 @@ public:
                 "in_virtuose_force", 1);
         // create force/wrench subscriber
         subscriber = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
-            "/bus0/ft_sensor0/ft_sensor_readings/wrench", 1,
+            "/force_torque_sensor_broadcaster/wrench", 1,
             std::bind(&HapticControl::SetWrenchCB, this, _1));
         // subscriber =
         // this->create_subscription<geometry_msgs::msg::WrenchStamped>("/ft_sensor_wrench",
         // 1, std::bind(&HapticControl::SetWrenchCB, this, _1));
+
+        // Set a callback for this node's parameters, i.e.: "bounding_box", etc.
+        cb_handle_bounding_box_ = param_subscriber_->add_parameter_callback("bounding_box", std::bind(&HapticControl::bounding_box_CB, this, std::placeholders::_1));
+        cb_scaling_factor_box_ = param_subscriber_->add_parameter_callback("scaling_factor", std::bind(&HapticControl::scaling_factor_CB, this, std::placeholders::_1));
 
         // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preparing services");
         client = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
             "virtuose_impedance");
 
         received_haptic_pose = false;
+    }
+
+    // Dedicated function to handle parameter updates
+    void bounding_box_CB(const rclcpp::Parameter & p)
+    {
+        RCLCPP_INFO(
+        this->get_logger(), "Toggled BOUNDING BOX");
+
+        bunding_box = p.as_int();
+
+        bounding_box_centre[0] = target_pose.pose.position.x;
+        bounding_box_centre[1] = target_pose.pose.position.y;
+        bounding_box_centre[2] = target_pose.pose.position.z;
+
+    }
+
+    void scaling_factor_CB(const rclcpp::Parameter & p)
+    {
+        RCLCPP_INFO(
+        this->get_logger(), "Received an update to the scaling factor");
+
+        scaling_factor = std::clamp(p.as_double(), 0.0, 1.0);
     }
 
     void current_ee_posCB(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
@@ -130,6 +164,7 @@ public:
         // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current force is: %f",
         // current_wrench.wrench.force.z);
     }
+    
     // Callback for topic out_virtuose_pose
     void out_virtuose_poseCB(
         const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg)
@@ -162,6 +197,13 @@ public:
         cur_pose[4] = msg->virtuose_pose.rotation.y;
         cur_pose[5] = msg->virtuose_pose.rotation.z;
         cur_pose[6] = msg->virtuose_pose.rotation.w;
+
+        if (this->use_limits)
+        {
+            cur_pose[0] = std::clamp(cur_pose[0], min_x, max_x);
+            cur_pose[1] = std::clamp(cur_pose[1], min_y, max_y);
+            cur_pose[2] = std::clamp(cur_pose[2], min_z, max_z);
+        }
         // if (ctr % 1000 == 0)
         // {
         // printf("Virtuose pose: %f %f %f %f %f %f %f\n", cur_pose[0], cur_pose[1],
@@ -203,6 +245,14 @@ public:
                     ee_starting_position.pose.orientation.y,
                     ee_starting_position.pose.orientation.z,
                     ee_starting_position.pose.orientation.w);
+
+        target_pose.pose.position.x = ee_starting_position.pose.position.x;
+        target_pose.pose.position.y = ee_starting_position.pose.position.y;
+        target_pose.pose.position.z = ee_starting_position.pose.position.z;
+        target_pose.pose.orientation.x = ee_starting_position.pose.orientation.x;
+        target_pose.pose.orientation.y = ee_starting_position.pose.orientation.y;
+        target_pose.pose.orientation.z = ee_starting_position.pose.orientation.z;
+        target_pose.pose.orientation.w = ee_starting_position.pose.orientation.w;
 
         // Request impedance mode
 
@@ -348,20 +398,27 @@ public:
         //               (long long unsigned int)status_date_nanosec;
 
         // Publish target position
-        geometry_msgs::msg::PoseStamped target_pose, current_pose;
+        geometry_msgs::msg::PoseStamped current_pose;
         target_pose.header.stamp.nanosec = get_clock()->now().nanoseconds();
         target_pose.header.stamp.sec = get_clock()->now().seconds();
         target_pose.header.frame_id = "base_link";
 
-        target_pose.pose.position.x =
-            ee_starting_position.pose.position.x +
-            (cur_pose[0] - haptic_starting_position.pose.position.x);
-        target_pose.pose.position.y =
-            ee_starting_position.pose.position.y +
-            (cur_pose[1] - haptic_starting_position.pose.position.y);
-        target_pose.pose.position.z =
-            ee_starting_position.pose.position.z +
-            (cur_pose[2] - haptic_starting_position.pose.position.z);
+        target_pose.pose.position.x += scaling_factor * (cur_pose[0] - haptic_starting_position.pose.position.x);
+        target_pose.pose.position.y += scaling_factor * (cur_pose[1] - haptic_starting_position.pose.position.y);
+        target_pose.pose.position.z += scaling_factor * (cur_pose[2] - haptic_starting_position.pose.position.z);
+        haptic_starting_position.pose.position.x = cur_pose[0];
+        haptic_starting_position.pose.position.y = cur_pose[1];
+        haptic_starting_position.pose.position.z = cur_pose[2];
+
+        // target_pose.pose.position.x =
+        //     ee_starting_position.pose.position.x +
+        //     scaling_factor * (cur_pose[0] - haptic_starting_position.pose.position.x);
+        // target_pose.pose.position.y =
+        //     ee_starting_position.pose.position.y +
+        //     scaling_factor * (cur_pose[1] - haptic_starting_position.pose.position.y);
+        // target_pose.pose.position.z =
+        //     ee_starting_position.pose.position.z +
+        //     scaling_factor * (cur_pose[2] - haptic_starting_position.pose.position.z);
 
         // eigen quat order is w x y z
         Eigen::Quaterniond qStart(haptic_starting_position.pose.orientation.w,
@@ -369,10 +426,10 @@ public:
                                   haptic_starting_position.pose.orientation.y,
                                   haptic_starting_position.pose.orientation.z);
         Eigen::Quaterniond qCur(cur_pose[6], cur_pose[3], cur_pose[4], cur_pose[5]);
-        Eigen::Quaterniond qEEStart(ee_starting_position.pose.orientation.w,
-                                    ee_starting_position.pose.orientation.x,
-                                    ee_starting_position.pose.orientation.y,
-                                    ee_starting_position.pose.orientation.z);
+        // Eigen::Quaterniond qEEStart(ee_starting_position.pose.orientation.w,
+        //                             ee_starting_position.pose.orientation.x,
+        //                             ee_starting_position.pose.orientation.y,
+        //                             ee_starting_position.pose.orientation.z);
 
         // // transform to rotation matrix
         // Eigen::Matrix3d rStart = qStart.toRotationMatrix();
@@ -410,11 +467,25 @@ public:
         current_pose.pose.orientation.w = qCur.w();
         current_target_pos_publisher->publish(current_pose);
 
-        Eigen::Quaterniond qDiff = qCur.conjugate() * qStart;
+        Eigen::Quaterniond qDiff = qCur.conjugate() * qStart; // start - cur
         qDiff.normalize();
 
-        Eigen::Quaterniond qTarget = qDiff.conjugate() * qEEStart;
+        // Scale the rotation
+        Eigen::Quaterniond qScaledDiff = Eigen::Quaterniond::Identity().slerp(scaling_factor, qDiff);
+        qScaledDiff.normalize();
+
+        Eigen::Quaterniond qTarget( target_pose.pose.orientation.w,
+                                    target_pose.pose.orientation.x,
+                                    target_pose.pose.orientation.y,
+                                    target_pose.pose.orientation.z);
+        qTarget = qScaledDiff.conjugate() * qTarget;
+        // Eigen::Quaterniond qTarget = qScaledDiff.conjugate() * qEEStart; // EEStart - diff = EEStart + (cur - start)
         qTarget.normalize();
+
+        haptic_starting_position.pose.orientation.x = cur_pose[3];
+        haptic_starting_position.pose.orientation.y = cur_pose[4];
+        haptic_starting_position.pose.orientation.z = cur_pose[5];
+        haptic_starting_position.pose.orientation.w = cur_pose[6];
 
         // qTarget = Eigen::Quaterniond(0.0, 1, 0.0, 0.0) * qTarget;
         // qTarget.normalize();
@@ -425,18 +496,18 @@ public:
         target_pose.pose.orientation.w = qTarget.w();
 
         // SAFE ZONE POSITION
-        if (this->use_limits)
+        if (this->bunding_box)
         {
-            target_pose.pose.position.x = std::clamp(target_pose.pose.position.x, min_x, max_x);
-            target_pose.pose.position.y = std::clamp(target_pose.pose.position.y, min_y, max_y);
-            target_pose.pose.position.z = std::clamp(target_pose.pose.position.z, min_z, max_z);
+            target_pose.pose.position.x = std::clamp(target_pose.pose.position.x, bounding_box_centre[0] - 0.015, bounding_box_centre[0] + 0.015);
+            target_pose.pose.position.y = std::clamp(target_pose.pose.position.y, bounding_box_centre[1] - 0.015, bounding_box_centre[1] + 0.015);
+            target_pose.pose.position.z = std::clamp(target_pose.pose.position.z, bounding_box_centre[2] - 0.015, bounding_box_centre[2] + 0.015);
         }
 
         // publish
         _target_pos_publisher->publish(target_pose);
 
-        // Print status every second
-        if (ctr % 100 == 0)
+        // Print status every five seconds
+        if (ctr % 5000 == 0)
         {
             RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
                         "Current position: %f %f %f", target_pose.pose.position.x,
@@ -445,7 +516,8 @@ public:
     }
 
     // Storage for virtuose pose
-    float cur_pose[7];
+    double cur_pose[7];
+    double bounding_box_centre[7];
     uint32_t pose_date_nanosec;
     uint32_t pose_date_sec;
     int ctr = 0;
@@ -462,7 +534,13 @@ public:
 
     float max_force;
     bool use_limits = false;
+    bool bunding_box = 0;
+    double scaling_factor = 1.0;
     double min_x, max_x, min_y, max_y, min_z, max_z;
+
+    std::shared_ptr<rclcpp::ParameterEventHandler> param_subscriber_;
+    std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_handle_bounding_box_;
+    std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_scaling_factor_box_;
 
     rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuoseStatus>::SharedPtr
         _out_virtuose_status;
@@ -487,6 +565,7 @@ public:
 
     geometry_msgs::msg::PoseStamped ee_current_pose;
     geometry_msgs::msg::PoseStamped ee_starting_position;
+    geometry_msgs::msg::PoseStamped target_pose;
     geometry_msgs::msg::PoseStamped haptic_starting_position;
     bool received_ee_pose, received_haptic_pose;
 
