@@ -14,7 +14,9 @@ If you want to follow the ros2 way for creating a workspace, you can clone this 
     ```bash
     source /opt/ros/$ROS-DISTRO/local_setup.bash
     ```
+    ```bash
     cp  <path_to_ws>/src/haptic_interface_ROS2/*.sh  <path_to_ws>
+    ```
 1. Copy the RaptorAPI shared libraries to "src/haption_raptor_api/Dependencies/RaptorAPI/bin/Linux/glibc-<version>"
 2. Make sure that the ".param" file for your device is accessible under /etc/Haption/Connector
 3. Prepare the raptor_api_interfaces:
