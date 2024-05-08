@@ -6,8 +6,10 @@ This guide is written for Linux, Windows users need to adapt it in the appropria
 ## Installation and setup
 1. Installation of ros2: 
 https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html
-2. Clone as a workspace:
-If you want to follow the ros2 way for creating a workspace, you can clone this repository under ~/ros2_ws/, or visit the documentation page for creating a worspace https://docs.ros.org/en/humble/Tutorials/Beginner-Client-Libraries/Creating-A-Workspace/Creating-A-Workspace.html
+2. Clone as a workspace named `haption_ws`:
+    ```bash
+    git clone https://github.com/idra-lab/haptic_interface_ROS2 haption_ws
+    ```
 3. RaptorAPI headers are already included under src/haption_raptor_api/Dependencies/RaptorAPI
 ## Usage
 0. Source ROS environment and copy shell scripts to the workspace root:
