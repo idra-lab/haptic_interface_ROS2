@@ -21,6 +21,8 @@
 #include "rclcpp/parameter_event_handler.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/wait_for_message.hpp"
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 using namespace Eigen;
 
@@ -82,10 +84,6 @@ public:
                 "out_virtuose_pose", 1,
                 std::bind(&HapticControl::out_virtuose_poseCB, this, _1));
 
-        _current_ee_pos =
-            this->create_subscription<geometry_msgs::msg::PoseStamped>(
-                "/tool0_pose", 1,
-                std::bind(&HapticControl::current_ee_posCB, this, _1));
         _target_pos_publisher =
             this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                                     1);
@@ -113,40 +111,51 @@ public:
         client = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
             "virtuose_impedance");
 
+        // Initialize the TF2 transform listener and buffer
+        tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+        tf_listener_ =
+            std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
+        pose_update_timer_ = this->create_wall_timer(
+            2ms, std::bind(&HapticControl::update_current_ee_pos, this));
         received_haptic_pose = false;
     }
 
     // Dedicated function to handle parameter updates
-    void bounding_box_CB(const rclcpp::Parameter & p)
+    void bounding_box_CB(const rclcpp::Parameter &p)
     {
         RCLCPP_INFO(
-        this->get_logger(), "Toggled BOUNDING BOX");
+            this->get_logger(), "Toggled BOUNDING BOX");
 
         bunding_box = p.as_int();
 
         bounding_box_centre[0] = target_pose.pose.position.x;
         bounding_box_centre[1] = target_pose.pose.position.y;
         bounding_box_centre[2] = target_pose.pose.position.z;
-
     }
 
-    void scaling_factor_CB(const rclcpp::Parameter & p)
+    void scaling_factor_CB(const rclcpp::Parameter &p)
     {
         RCLCPP_INFO(
-        this->get_logger(), "Received an update to the scaling factor");
+            this->get_logger(), "Received an update to the scaling factor");
 
         scaling_factor = std::clamp(p.as_double(), 0.0, 1.0);
     }
 
-    void current_ee_posCB(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    void update_current_ee_pos()
     {
-        ee_current_pose.pose.position.x = msg->pose.position.x;
-        ee_current_pose.pose.position.y = msg->pose.position.y;
-        ee_current_pose.pose.position.z = msg->pose.position.z;
-        ee_current_pose.pose.orientation.x = msg->pose.orientation.x;
-        ee_current_pose.pose.orientation.y = msg->pose.orientation.y;
-        ee_current_pose.pose.orientation.z = msg->pose.orientation.z;
-        ee_current_pose.pose.orientation.w = msg->pose.orientation.w;
+        try{
+            auto trans = tf_buffer_->lookupTransform("probe", "base_link", tf2::TimePointZero);
+        ee_current_pose.pose.position.x = trans.transform.translation.x;
+        ee_current_pose.pose.position.y = trans.transform.translation.y;
+        ee_current_pose.pose.position.z = trans.transform.translation.z;
+        ee_current_pose.pose.orientation.x = trans.transform.rotation.x;
+        ee_current_pose.pose.orientation.y = trans.transform.rotation.y;
+        ee_current_pose.pose.orientation.z = trans.transform.rotation.z;
+        ee_current_pose.pose.orientation.w = trans.transform.rotation.w;
+        }catch(const std::exception& e){
+            RCLCPP_ERROR(this->get_logger(), "Error in current_ee_posCB: %s", e.what());
+        }
     }
 
     void SetWrenchCB(const geometry_msgs::msg::WrenchStamped target_wrench)
@@ -164,7 +173,7 @@ public:
         // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current force is: %f",
         // current_wrench.wrench.force.z);
     }
-    
+
     // Callback for topic out_virtuose_pose
     void out_virtuose_poseCB(
         const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg)
@@ -227,12 +236,24 @@ public:
         received_ee_pose = false;
         while (!received_ee_pose)
         {
-            received_ee_pose = rclcpp::wait_for_message(
-                ee_starting_position, this->shared_from_this(), "/tool0_pose",
-                std::chrono::seconds(1));
-            RCLCPP_INFO(this->get_logger(),
-                        "still waiting for ee position: result is %d",
-                        received_ee_pose);
+            try
+            {
+
+                auto trans = tf_buffer_->lookupTransform("probe", "base_link", tf2::TimePointZero);
+                ee_starting_position.pose.position.x = trans.transform.translation.x;
+                ee_starting_position.pose.position.y = trans.transform.translation.y;
+                ee_starting_position.pose.position.z = trans.transform.translation.z;
+                ee_starting_position.pose.orientation.x = trans.transform.rotation.x;
+                ee_starting_position.pose.orientation.y = trans.transform.rotation.y;
+                ee_starting_position.pose.orientation.z = trans.transform.rotation.z;
+                ee_starting_position.pose.orientation.w = trans.transform.rotation.w;
+                received_ee_pose = true;
+            }
+            catch (tf2::TransformException &ex)
+            {
+                RCLCPP_ERROR(this->get_logger(), "EE pose not available: %s", ex.what());
+                            
+            }
         }
         RCLCPP_INFO(this->get_logger(),
                     "\n\nEnd Effector Pose received \nEE starting position is : x: "
@@ -333,7 +354,8 @@ public:
         RCLCPP_INFO(this->get_logger(), "\033[0;32mImpedance thread started\033[0m");
     }
 
-    void ImpedanceThread()
+    void
+    ImpedanceThread()
     {
         if (!received_haptic_pose)
         {
@@ -474,10 +496,10 @@ public:
         Eigen::Quaterniond qScaledDiff = Eigen::Quaterniond::Identity().slerp(scaling_factor, qDiff);
         qScaledDiff.normalize();
 
-        Eigen::Quaterniond qTarget( target_pose.pose.orientation.w,
-                                    target_pose.pose.orientation.x,
-                                    target_pose.pose.orientation.y,
-                                    target_pose.pose.orientation.z);
+        Eigen::Quaterniond qTarget(target_pose.pose.orientation.w,
+                                   target_pose.pose.orientation.x,
+                                   target_pose.pose.orientation.y,
+                                   target_pose.pose.orientation.z);
         qTarget = qScaledDiff.conjugate() * qTarget;
         // Eigen::Quaterniond qTarget = qScaledDiff.conjugate() * qEEStart; // EEStart - diff = EEStart + (cur - start)
         qTarget.normalize();
@@ -556,12 +578,14 @@ public:
     rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr subscriber;
 
     // position control
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr
-        _current_ee_pos;
+    rclcpp::TimerBase::SharedPtr pose_update_timer_;
     rclcpp ::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
         _target_pos_publisher;
     rclcpp ::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
         current_target_pos_publisher;
+
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
     geometry_msgs::msg::PoseStamped ee_current_pose;
     geometry_msgs::msg::PoseStamped ee_starting_position;

@@ -22,6 +22,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(raptor_api_interfaces REQUIRED)
 find_package(haption_raptor_api REQUIRED)
+find_package(tf2_ros REQUIRED)
 # find eigen
 find_package(Eigen3 REQUIRED)
 # uncomment the following section in order to fill in
@@ -29,7 +30,7 @@ find_package(Eigen3 REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 add_executable(${This} src/haptic_control.cpp)
-ament_target_dependencies(${This} rclcpp raptor_api_interfaces haption_raptor_api)
+ament_target_dependencies(${This} rclcpp raptor_api_interfaces haption_raptor_api tf2_ros )
 
 target_include_directories(${This} PUBLIC
 

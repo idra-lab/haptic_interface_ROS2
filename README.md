@@ -78,7 +78,8 @@ Finally run
 ```bash
 ./haptic_control.sh
 ```
-
+# Trouble shooting
+- If you get this error `HAPTION::RaptorAPI::StartLogging() failed with error 13` you probably did not sourced `entrypoint.sh`
 
     
     
