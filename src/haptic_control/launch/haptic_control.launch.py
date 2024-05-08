@@ -87,7 +87,6 @@ def generate_launch_description():
     rclpy.shutdown()
 
     print("\n\n\033[91mREMEMBER TO ACTIVATE FORCE FEEDBACK BUTTON ON HAPTIC DEVICE\033[00m\n\n")
-    time.sleep(1)
 
     ############################## HAPTIC DEVICE CONTROL NODE ##################
     # haptic_wrapper
@@ -105,7 +104,7 @@ def generate_launch_description():
 
     # CALIBRATION NODE
     haptic_calibration_node = TimerAction(
-        period = 3.0,
+        period = 2.0,
         actions = [Node(
         package="test_calibration",
         executable="test_calibration",
@@ -117,12 +116,12 @@ def generate_launch_description():
     haptic_parameters_control = haption_ws_path + "src/haptic_control/parameters.yaml"
 
     haptic_control_node = TimerAction(
-        period=6.0,
+        period=4.0,
         actions=[
             Node(
                 package="haptic_control",
                 executable="haptic_control",
-                remappings=[('/target_frame', '/target_frame_haptic')],
+                # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
                     ParameterFile(haptic_parameters_control)
                 ]

@@ -59,14 +59,17 @@ public:
         this->min_z = this->get_parameter("min_z").as_double();
         // this->declare_parameter("max_z", 1.0);
         this->max_z = this->get_parameter("max_z").as_double();
-        // safety XYZ position zone -> read from config file
-        this->get_parameter("max_force", max_force);
 
+        this->get_parameter("max_force", max_force);
+        // safety XYZ position zone -> read from config file
+        this->force_scale_ = this->get_parameter("force_scale").as_double();
+        this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
+        this->base_link_name_ = this->get_parameter("base_link_name").as_string();
         // Create a parameter subscriber that can be used to monitor parameter changes
         param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
 
         // init wrench msg
-        current_wrench.header.frame_id = "base_link";
+        current_wrench.header.frame_id = base_link_name_;
         current_wrench.wrench.force.x = 0.0;
         current_wrench.wrench.force.y = 0.0;
         current_wrench.wrench.force.z = 0.0;
@@ -84,10 +87,10 @@ public:
                 "out_virtuose_pose", 1,
                 std::bind(&HapticControl::out_virtuose_poseCB, this, _1));
 
-        _target_pos_publisher =
+        target_pos_publisher_ =
             this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                                     1);
-        current_target_pos_publisher =
+        current_target_pos_publisher_ =
             this->create_publisher<geometry_msgs::msg::PoseStamped>(
                 "/current_frame", 1);
 
@@ -145,7 +148,7 @@ public:
     void update_current_ee_pos()
     {
         try{
-            auto trans = tf_buffer_->lookupTransform("probe", "base_link", tf2::TimePointZero);
+            auto trans = tf_buffer_->lookupTransform(tool_link_name_, base_link_name_, tf2::TimePointZero);
         ee_current_pose.pose.position.x = trans.transform.translation.x;
         ee_current_pose.pose.position.y = trans.transform.translation.y;
         ee_current_pose.pose.position.z = trans.transform.translation.z;
@@ -239,7 +242,7 @@ public:
             try
             {
 
-                auto trans = tf_buffer_->lookupTransform("probe", "base_link", tf2::TimePointZero);
+                auto trans = tf_buffer_->lookupTransform(tool_link_name_, base_link_name_, tf2::TimePointZero);
                 ee_starting_position.pose.position.x = trans.transform.translation.x;
                 ee_starting_position.pose.position.y = trans.transform.translation.y;
                 ee_starting_position.pose.position.z = trans.transform.translation.z;
@@ -330,23 +333,7 @@ public:
                          "Failed to call service impedance, client_id is zero!");
             return;
         }
-
         ctr = 0;
-
-        // Wait for first pose of device and fill starting pose
-        // while (!received_haptic_pose)
-        // {
-        //   received_haptic_pose =
-        //   rclcpp::wait_for_message(haptic_starting_position,
-        //   this->shared_from_this(), "/out_virtuose_pose",
-        //   std::chrono::seconds(1)); RCLCPP_INFO(this->get_logger(), "still
-        //   waiting for haptic device position");
-        // }
-        // RCLCPP_INFO(this->get_logger(), "Haptic Device pose received \nHaptic
-        // starting position is : x: %f | y: %f | z: %f",
-        //             haptic_starting_position.pose.position.x,
-        //             haptic_starting_position.pose.position.y,
-        //             haptic_starting_position.pose.position.z);
 
         // Perform impedance loop at 1000 Hz
         impedanceThread = this->create_wall_timer(
@@ -369,13 +356,13 @@ public:
         // filter noise
         float alpha = 0;
         force.virtuose_force.force.x =
-            0.3 * (alpha * old_force.virtuose_force.force.x +
+            force_scale_ * (alpha * old_force.virtuose_force.force.x +
                    (1 - alpha) * current_wrench.wrench.force.x);
         force.virtuose_force.force.y =
-            0.3 * (alpha * old_force.virtuose_force.force.y +
+            force_scale_ * (alpha * old_force.virtuose_force.force.y +
                    (1 - alpha) * current_wrench.wrench.force.y);
         force.virtuose_force.force.z =
-            0.3 * (alpha * old_force.virtuose_force.force.z +
+            force_scale_ * (alpha * old_force.virtuose_force.force.z +
                    (1 - alpha) * current_wrench.wrench.force.z);
         // torque omitted for control simplicity
         force.virtuose_force.torque.x =
@@ -423,7 +410,7 @@ public:
         geometry_msgs::msg::PoseStamped current_pose;
         target_pose.header.stamp.nanosec = get_clock()->now().nanoseconds();
         target_pose.header.stamp.sec = get_clock()->now().seconds();
-        target_pose.header.frame_id = "base_link";
+        target_pose.header.frame_id = base_link_name_;
 
         target_pose.pose.position.x += scaling_factor * (cur_pose[0] - haptic_starting_position.pose.position.x);
         target_pose.pose.position.y += scaling_factor * (cur_pose[1] - haptic_starting_position.pose.position.y);
@@ -465,7 +452,7 @@ public:
         // Eigen::Matrix3d rTarget = rEEStart * rDiff;
 
         // transform back to quaternion
-        current_pose.header.frame_id = "base_link";
+        current_pose.header.frame_id = base_link_name_;
         current_pose.pose.position.x = target_pose.pose.position.x;
         current_pose.pose.position.y = target_pose.pose.position.y;
         current_pose.pose.position.z = target_pose.pose.position.z;
@@ -487,7 +474,7 @@ public:
         current_pose.pose.orientation.y = qCur.y();
         current_pose.pose.orientation.z = qCur.z();
         current_pose.pose.orientation.w = qCur.w();
-        current_target_pos_publisher->publish(current_pose);
+        current_target_pos_publisher_->publish(current_pose);
 
         Eigen::Quaterniond qDiff = qCur.conjugate() * qStart; // start - cur
         qDiff.normalize();
@@ -526,10 +513,14 @@ public:
         }
 
         // publish
-        _target_pos_publisher->publish(target_pose);
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+                    "PUBLISHING TARGET POSITION: %f %f %f", target_pose.pose.position.x,
+                    target_pose.pose.position.y, target_pose.pose.position.z);
+        
+        target_pos_publisher_->publish(target_pose);
 
-        // Print status every five seconds
-        if (ctr % 5000 == 0)
+        // Print status every second
+        if (ctr % 1000 == 0)
         {
             RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
                         "Current position: %f %f %f", target_pose.pose.position.x,
@@ -576,13 +567,15 @@ public:
         client;
     raptor_api_interfaces::msg::InVirtuoseForce old_force;
     rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr subscriber;
+    std::string base_link_name_, tool_link_name_;
+    double force_scale_;
 
     // position control
     rclcpp::TimerBase::SharedPtr pose_update_timer_;
     rclcpp ::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
-        _target_pos_publisher;
+        target_pos_publisher_;
     rclcpp ::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
-        current_target_pos_publisher;
+        current_target_pos_publisher_;
 
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;

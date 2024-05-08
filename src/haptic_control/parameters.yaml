@@ -13,3 +13,6 @@ haptic_control:
     max_y:  0.18
     min_z:  -0.10
     max_z:  0.13
+    tool_link_name: "probe"
+    base_link_name: "base_link"
+    force_scale : 0.3
