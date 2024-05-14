@@ -31,6 +31,7 @@ find_package(Eigen3 REQUIRED)
 
 add_executable(${This} src/haptic_control.cpp)
 ament_target_dependencies(${This} rclcpp raptor_api_interfaces haption_raptor_api tf2_ros )
+target_include_directories(${This} PUBLIC include)
 
 target_include_directories(${This} PUBLIC
 
