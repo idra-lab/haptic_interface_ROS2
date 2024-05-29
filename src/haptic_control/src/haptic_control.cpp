@@ -424,7 +424,7 @@ void HapticControl::ImpedanceThread()
   qDiff.normalize();
 
   // transform the rotation error to the robot base frame
-  qDiff = q_haptic_base_to_robot_base_.conjugate() * qDiff * q_haptic_base_to_robot_base_;
+  qDiff = q_haptic_base_to_robot_base_ * qDiff * q_haptic_base_to_robot_base_.conjugate();
 
   // applying delta rotation to the end effector starting orientation
   Eigen::Quaterniond qTarget = qDiff.conjugate() * qEEStart;
