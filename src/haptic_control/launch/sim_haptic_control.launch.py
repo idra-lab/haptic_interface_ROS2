@@ -11,7 +11,7 @@ import time
 import sys
 
 
-
+# THIS IS USED FOR THE COPPELIASIM SIMULATION
 
 
 ################################################################################

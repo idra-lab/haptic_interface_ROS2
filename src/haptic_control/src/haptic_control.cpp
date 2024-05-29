@@ -67,7 +67,7 @@ HapticControl::HapticControl(const std::string &name,
           "in_virtuose_force", 1);
   // create force/wrench subscriber
   subscriber = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
-      "/force_torque_sensor_broadcaster/wrench", 1,
+      "/bus0/ft_sensor0/ft_sensor_readings/wrench", 1,
       std::bind(&HapticControl::SetWrenchCB, this, _1));
   // subscriber =
   // this->create_subscription<geometry_msgs::msg::WrenchStamped>("/ft_sensor_wrench",

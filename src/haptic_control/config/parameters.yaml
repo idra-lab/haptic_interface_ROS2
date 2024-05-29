@@ -7,12 +7,19 @@ haptic_control:
     max_force: 6.0
     # robot position safety limits
     use_limits: false
-    min_x:  0.33
-    max_x:  0.48
-    min_y: -0.03
-    max_y:  0.18
-    min_z:  -0.10
-    max_z:  0.13
+    min_x:  -100.0
+    max_x:  100.0
+    min_y:  -100.0
+    max_y:  100.0
+    min_z:  -100.0
+    max_z:  100.0
+    # min_x:  0.33
+    # max_x:  0.48
+    # min_y: -0.03
+    # max_y:  0.18
+    # min_z:  -0.10
+    # max_z:  0.13
+
     tool_link_name: "probe"
     base_link_name: "base_link"
     force_scale : 0.3
