@@ -61,23 +61,22 @@ def generate_launch_description():
     "                      | |                           \n"+
     "                      |_|                           \n\033[00m")
 
-    calibration_pkg_share = get_package_share_directory('test_calibration')
-    haptic_control_pkg_share = get_package_share_directory('haptic_control')
 
     ############################## HAPTIC DEVICE CALIBRATION ###################
-    print("\n\n\n\033[93m WARNING: ROBOT MUST NOT BE IN CONTACT WITH ANYTHING DURING CALIBRATION\033[00m\n\n")
-    # time.sleep(3)
-    print("\n\n\033[92mRESETTING FORCE SENSOR...\033[00m\n")
-    rclpy.init()
-    reset_wrench_node = FTReset()
-    response = reset_wrench_node.send_request()
-    reset_wrench_node.get_logger().info('\n\n'+str(response))
-    while 'success=True' not in str(response):
-        print("\n\n\nERROR: Force sensor not reset, trying again...\n\n\n")
-        time.sleep(0.5)
-        response = reset_wrench_node.send_request()
-    reset_wrench_node.destroy_node()
-    rclpy.shutdown()
+    # print("\n\n\n\033[93m WARNING: ROBOT MUST NOT BE IN CONTACT WITH ANYTHING DURING CALIBRATION\033[00m\n\n")
+    # # time.sleep(3)
+    # print("\n\n\033[92mRESETTING FORCE SENSOR...\033[00m\n")
+    # rclpy.init()
+    # reset_wrench_node = FTReset()
+    # response = reset_wrench_node.send_request()
+    # reset_wrench_node.get_logger().info('\n\n'+str(response))
+    # print("Calibration result: "+str(response))
+    # while 'success=True' not in str(response):
+    #     print("\n\n\nERROR: Force sensor not reset, trying again...\n\n\n")
+    #     response = reset_wrench_node.send_request()
+    #     time.sleep(5)
+    # reset_wrench_node.destroy_node()
+    # rclpy.shutdown()
 
     print("\n\n\033[91mREMEMBER TO ACTIVATE FORCE FEEDBACK BUTTON ON HAPTIC DEVICE\033[00m\n\n")
 
@@ -92,8 +91,8 @@ def generate_launch_description():
 
     )
 
-    haptic_parameters_calibration = calibration_pkg_share + "/config/parameters.yaml"
-
+    haptic_parameters_calibration = get_package_share_directory('test_calibration') + "/config/parameters.yaml"
+    print("CALIBRATION FILE: ",haptic_parameters_calibration)
 
     # CALIBRATION NODE
     haptic_calibration_node = TimerAction(
@@ -106,7 +105,7 @@ def generate_launch_description():
     )
 
     # SET RIGHT PATH TO YAML
-    haptic_parameters_control = haptic_control_pkg_share + "/config/parameters.yaml"
+    haptic_parameters_control = get_package_share_directory('haptic_control') + "/config/parameters.yaml"
 
     haptic_control_node = TimerAction(
         period=4.0,
