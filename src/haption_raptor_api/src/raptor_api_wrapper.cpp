@@ -89,12 +89,12 @@ private:
         last_in_date = _now;
         if (ctr % 1000 == 0)
         {
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Pose set point: %f %f %f %f %f %f %f",set_pose[0],set_pose[1],set_pose[2],set_pose[3],set_pose[4],set_pose[5],set_pose[6]);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Pose set point: %f %f %f %f %f %f %f", set_pose[0], set_pose[1], set_pose[2], set_pose[3], set_pose[4], set_pose[5], set_pose[6]);
         }
         // Watchdog on receiving pose setpoint
         if ((_now - last_loop_date) > 30000000)
         {
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set pose: %d, going to state READY", _now - last_loop_date);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set pose: %ld, going to state READY", _now - last_loop_date);
             Reset();
             return;
         }
@@ -120,12 +120,12 @@ private:
         last_in_date = _now;
         if (ctr % 1000 == 0)
         {
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Speed set point: %f %f %f %f %f %f",set_speed[0],set_speed[1],set_speed[2],set_speed[3],set_speed[4],set_speed[5]);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Speed set point: %f %f %f %f %f %f", set_speed[0], set_speed[1], set_speed[2], set_speed[3], set_speed[4], set_speed[5]);
         }
         // Watchdog on receiving speed setpoint
         if ((_now - last_loop_date) > 30000000)
         {
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set speed: %d, going to state READY", _now - last_loop_date);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set speed: %ld, going to state READY", _now - last_loop_date);
             Reset();
             return;
         }
@@ -156,7 +156,7 @@ private:
         // Watchdog on receiving force setpoint
         if ((_now - last_loop_date) > 30000000)
         {
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set force: %d, going to state READY", _now - last_loop_date);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set force: %ld, going to state READY", _now - last_loop_date);
             Reset();
             return;
         }
@@ -221,19 +221,19 @@ private:
                     switch (newStatus)
                     {
                     case HAPTION::CalibrationStatus::C_WAITINGFORPOWER:
-                        std::cout << "Please push the power button!" << std::endl;
+                        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Please push the power button!");
                         break;
                     case HAPTION::CalibrationStatus::C_WAITINGFORUSER:
-                        std::cout << "Please move the rotation joints to their corresponding calibration positions!" << std::endl;
+                        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Please move the rotation joints to their corresponding calibration positions!");
                         break;
                     case HAPTION::CalibrationStatus::C_MOVING:
-                        std::cout << "Warning: the device is moving!" << std::endl;
+                        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Warning: the device is moving!");
                         break;
                     case HAPTION::CalibrationStatus::C_CALIBRATED:
-                        // std::cout << "Calibration finished. Please remember to depress the power or the calibration button!" << std::endl;
+                        // RCLCPP_INFO(rclcpp::get_logger("rclcpp"),"Calibration finished. Please remember to depress the power or the calibration button!")
                         break;
                     case HAPTION::CalibrationStatus::C_CALIBRATIONFAILED:
-                        std::cout << "Calibration has failed, please restart again" << std::endl;
+                        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Calibration has failed, please restart again (Maybe you forgot to unpress the green button?)");
                         break;
                     case HAPTION::CalibrationStatus::C_IDLE:
                         break;
@@ -438,7 +438,7 @@ private:
 
         // This is the time-stamp of the last loop
         state = STATE_CART_ADM;
-        auto lastStep = std::chrono::system_clock::now();
+        // auto lastStep = std::chrono::system_clock::now();
         ErrorCode error;
         last_loop_date = now().nanoseconds();
 
@@ -506,11 +506,10 @@ private:
         HAPTION::JointVector angles;
         raptorHandle.GetJointAngles(angles);
 
-
         // Watchdog on receiving pose setpoint
         if (isFirstSetpointReceived && abs((int64_t)last_in_date - (int64_t)last_loop_date) > 30000000)
         {
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set pose: %d, going to state READY", last_in_date - last_loop_date);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set pose: %ld, going to state READY", last_in_date - last_loop_date);
             Reset();
             return;
         }
@@ -528,7 +527,8 @@ private:
             PoseSetPoint.q_w = set_pose[6];
             raptorHandle.SetCartesianPose(PoseSetPoint);
         }
-        else{
+        else
+        {
             raptorHandle.SetCartesianPose(manipPose);
         }
         // Send the force-feedback device its own speed back to avoid drag errors
@@ -543,7 +543,8 @@ private:
             SpeedSetPoint.r_z = set_speed[5];
             raptorHandle.SetCartesianSpeed(SpeedSetPoint);
         }
-        else{
+        else
+        {
             raptorHandle.SetCartesianSpeed(manipSpeed);
         }
 
@@ -552,8 +553,8 @@ private:
         if (error != HAPTION::ErrorCode::E_NOERROR)
         {
             RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "HAPTION::RaptorAPI::SendSetpoints() failed with error %d", (int)error);
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Pose set point: %f %f %f %f %f %f %f",set_pose[0],set_pose[1],set_pose[2],set_pose[3],set_pose[4],set_pose[5],set_pose[6]);
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Speed set point: %f %f %f %f %f %f",set_speed[0],set_speed[1],set_speed[2],set_speed[3],set_speed[4],set_speed[5]);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Pose set point: %f %f %f %f %f %f %f", set_pose[0], set_pose[1], set_pose[2], set_pose[3], set_pose[4], set_pose[5], set_pose[6]);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Speed set point: %f %f %f %f %f %f", set_speed[0], set_speed[1], set_speed[2], set_speed[3], set_speed[4], set_speed[5]);
 
             Reset();
         }
@@ -710,7 +711,7 @@ private:
 
         // This is the time-stamp of the last loop
         state = STATE_CART_IMP;
-        auto lastStep = std::chrono::system_clock::now();
+        // auto lastStep = std::chrono::system_clock::now();
         last_loop_date = now().nanoseconds();
 
         ErrorCode error;
@@ -785,7 +786,7 @@ private:
         // Watchdog on receiving force setpoint
         if (isFirstSetpointReceived && abs((int64_t)last_in_date - (int64_t)last_loop_date) > 30000000)
         {
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set force: %d, going to state READY", last_in_date - last_loop_date);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Timeout on set force: %ld, going to state READY", last_in_date - last_loop_date);
             Reset();
             return;
         }

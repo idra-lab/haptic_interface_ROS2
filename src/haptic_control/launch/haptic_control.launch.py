@@ -1,12 +1,9 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription, OpaqueFunction
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch.launch_context import LaunchContext
-from launch_ros.substitutions import FindPackageShare
 from launch_ros.parameter_descriptions import ParameterFile
-from launch.actions import TimerAction, DeclareLaunchArgument
+from launch.actions import TimerAction
+from ament_index_python.packages import get_package_share_directory
+
 import time
 import sys
 
@@ -64,13 +61,8 @@ def generate_launch_description():
     "                      | |                           \n"+
     "                      |_|                           \n\033[00m")
 
-    # time.sleep(1)
-    # Get path to haption_ws from command line
-    for arg in sys.argv:
-        if arg.startswith("haption_ws_path:="):
-            haption_ws_path = str(arg.split(":=")[1])
-
-
+    calibration_pkg_share = get_package_share_directory('test_calibration')
+    haptic_control_pkg_share = get_package_share_directory('haptic_control')
 
     ############################## HAPTIC DEVICE CALIBRATION ###################
     print("\n\n\n\033[93m WARNING: ROBOT MUST NOT BE IN CONTACT WITH ANYTHING DURING CALIBRATION\033[00m\n\n")
@@ -80,9 +72,10 @@ def generate_launch_description():
     reset_wrench_node = FTReset()
     response = reset_wrench_node.send_request()
     reset_wrench_node.get_logger().info('\n\n'+str(response))
-    if 'success=True' not in str(response):
-        print("\n\n\nERROR: Force sensor not reset, restart full_env.launch.py \n\n\n")
-        exit()
+    while 'success=True' not in str(response):
+        print("\n\n\nERROR: Force sensor not reset, trying again...\n\n\n")
+        time.sleep(0.5)
+        response = reset_wrench_node.send_request()
     reset_wrench_node.destroy_node()
     rclpy.shutdown()
 
@@ -99,7 +92,7 @@ def generate_launch_description():
 
     )
 
-    haptic_parameters_calibration = haption_ws_path + "src/test_calibration/parameters.yaml"
+    haptic_parameters_calibration = calibration_pkg_share + "/config/parameters.yaml"
 
 
     # CALIBRATION NODE
@@ -113,7 +106,7 @@ def generate_launch_description():
     )
 
     # SET RIGHT PATH TO YAML
-    haptic_parameters_control = haption_ws_path + "src/haptic_control/parameters.yaml"
+    haptic_parameters_control = haptic_control_pkg_share + "/config/parameters.yaml"
 
     haptic_control_node = TimerAction(
         period=4.0,
