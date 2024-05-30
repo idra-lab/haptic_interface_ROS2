@@ -1,5 +1,6 @@
 #include "haptic_control.hpp"
-
+#include "tf2/convert.h"
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 using namespace Eigen;
 
 using std::placeholders::_1;
@@ -11,87 +12,89 @@ HapticControl::HapticControl(const std::string &name,
                              const rclcpp::NodeOptions &options)
     : Node(name, namespace_, options)
 {
-  this->declare_parameter("scaling_factor", 1.0);
+  this->declare_parameter("scaling_factor_", 1.0);
 
   // safety XYZ position zone -> default
-  this->use_bounding_box = this->get_parameter("use_bounding_box").as_bool();
+  this->use_bounding_box_ = this->get_parameter("use_bounding_box_").as_bool();
   // safety XYZ position zone -> default
   this->use_limits = this->get_parameter("use_limits").as_bool();
 
-  // this->declare_parameter("min_x", -1.0);
-  this->min_x = this->get_parameter("min_x").as_double();
-  // this->declare_parameter("max_x", 1.0);
-  this->max_x = this->get_parameter("max_x").as_double();
-  // this->declare_parameter("min_y", -1.0);
-  this->min_y = this->get_parameter("min_y").as_double();
-  // this->declare_parameter("max_y", 1.0);
-  this->max_y = this->get_parameter("max_y").as_double();
-  // this->declare_parameter("min_z", -1.0);
-  this->min_z = this->get_parameter("min_z").as_double();
-  // this->declare_parameter("max_z", 1.0);
-  this->max_z = this->get_parameter("max_z").as_double();
+  // this->declare_parameter("min_x_", -1.0);
+  this->min_x_ = this->get_parameter("min_x").as_double();
+  // this->declare_parameter("max_x_", 1.0);
+  this->max_x_ = this->get_parameter("max_x").as_double();
+  // this->declare_parameter("min_y_", -1.0);
+  this->min_y_ = this->get_parameter("min_y").as_double();
+  // this->declare_parameter("max_y_", 1.0);
+  this->max_y_ = this->get_parameter("max_y").as_double();
+  // this->declare_parameter("min_z_", -1.0);
+  this->min_z_ = this->get_parameter("min_z").as_double();
+  // this->declare_parameter("max_z_", 1.0);
+  this->max_z_ = this->get_parameter("max_z").as_double();
 
-  this->get_parameter("max_force", max_force);
+  this->get_parameter("max_force_", max_force_);
   // safety XYZ position zone -> read from config file
   this->force_scale_ = this->get_parameter("force_scale").as_double();
   this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
   this->base_link_name_ = this->get_parameter("base_link_name").as_string();
+  this->ft_link_name_ = this->get_parameter("ft_link_name").as_string();
+
   // Create a parameter subscriber that can be used to monitor parameter changes
   param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
-  this->get_parameter("max_force", max_force);
+  this->get_parameter("max_force_", max_force_);
 
   // init wrench msg
-  current_wrench.header.frame_id = "base_link";
-  current_wrench.wrench.force.x = 0.0;
-  current_wrench.wrench.force.y = 0.0;
-  current_wrench.wrench.force.z = 0.0;
-  current_wrench.wrench.torque.x = 0.0;
-  current_wrench.wrench.torque.y = 0.0;
-  current_wrench.wrench.torque.z = 0.0;
+  current_wrench_.header.frame_id = base_link_name_;
+  current_wrench_.wrench.force.x = 0.0;
+  current_wrench_.wrench.force.y = 0.0;
+  current_wrench_.wrench.force.z = 0.0;
+  current_wrench_.wrench.torque.x = 0.0;
+  current_wrench_.wrench.torque.y = 0.0;
+  current_wrench_.wrench.torque.z = 0.0;
 
   // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preparing publishers");
-  _out_virtuose_status = this->create_subscription<
+  out_virtuose_status_ = this->create_subscription<
       raptor_api_interfaces::msg::OutVirtuoseStatus>(
       "out_virtuose_status", 1,
       std::bind(&HapticControl::out_virtuose_statusCB, this, _1));
-  _out_virtuose_pose =
+  _out_virtuose_pose_ =
       this->create_subscription<raptor_api_interfaces::msg::OutVirtuosePose>(
           "out_virtuose_pose", 1,
-          std::bind(&HapticControl::out_virtuose_poseCB, this, _1));
+          std::bind(&HapticControl::out_virtuose_pose_CB, this, _1));
 
   target_pos_publisher_ =
       this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                               1);
   current_target_pos_publisher_ =
       this->create_publisher<geometry_msgs::msg::PoseStamped>(
-          "/current_frame", 1);
+          "current_frame", 1);
 
   _in_virtuose_force =
       this->create_publisher<raptor_api_interfaces::msg::InVirtuoseForce>(
           "in_virtuose_force", 1);
   // create force/wrench subscriber
-  subscriber = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
-      "/bus0/ft_sensor0/ft_sensor_readings/wrench", 1,
+  ft_subscriber_ = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
+      "bus0/ft_sensor0/ft_sensor_readings/wrench", 1,
       std::bind(&HapticControl::SetWrenchCB, this, _1));
 
-  client = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
+  client_ = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
       "virtuose_impedance");
 
   // Set a callback for this node's parameters, i.e.: "bounding_box", etc.
   cb_handle_bounding_box_ = param_subscriber_->add_parameter_callback(
       "bounding_box",
       std::bind(&HapticControl::bounding_box_CB, this, std::placeholders::_1));
-  cb_scaling_factor_box_ = param_subscriber_->add_parameter_callback(
-      "scaling_factor", std::bind(&HapticControl::scaling_factor_CB, this,
-                                  std::placeholders::_1));
-  received_haptic_pose = false;
+  cb_scaling_factor__box_ = param_subscriber_->add_parameter_callback(
+      "scaling_factor", std::bind(&HapticControl::scaling_factor__CB, this,
+                                   std::placeholders::_1));
+  received_haptic_pose_ = false;
 
-  // Initialize the TF2 transform listener and buffer
+  // Initializes the TF2 transform listener and buffer
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
-  // init default rotation from haptic base frame to robot base frame (-90 deg on z axis)
-  Eigen::Quaterniond tmp(Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
+  // defines the rotation from the robot base frame to the haptic base frame
+  Eigen::Quaterniond tmp(Eigen::AngleAxisd(M_PI/2, Eigen::Vector3d::UnitZ()));
   q_haptic_base_to_robot_base_.x() = tmp.x();
   q_haptic_base_to_robot_base_.y() = tmp.y();
   q_haptic_base_to_robot_base_.z() = tmp.z();
@@ -102,70 +105,92 @@ void HapticControl::bounding_box_CB(const rclcpp::Parameter &p)
 {
   RCLCPP_INFO(this->get_logger(), "Toggled BOUNDING BOX");
 
-  use_bounding_box = (bool)p.as_int();
+  use_bounding_box_ = (bool)p.as_int();
 
-  bounding_box_center[0] = target_pose.pose.position.x;
-  bounding_box_center[1] = target_pose.pose.position.y;
-  bounding_box_center[2] = target_pose.pose.position.z;
+  bounding_box_center_[0] = target_pose_.pose.position.x;
+  bounding_box_center_[1] = target_pose_.pose.position.y;
+  bounding_box_center_[2] = target_pose_.pose.position.z;
 }
-void HapticControl::scaling_factor_CB(const rclcpp::Parameter &p)
+void HapticControl::scaling_factor__CB(const rclcpp::Parameter &p)
 {
   RCLCPP_INFO(this->get_logger(), "Received an update to the scaling factor");
 
-  scaling_factor = std::clamp(p.as_double(), 0.0, 1.0);
+  scaling_factor_ = std::clamp(p.as_double(), 0.0, 1.0);
 }
 
 void HapticControl::SetWrenchCB(
     const geometry_msgs::msg::WrenchStamped target_wrench)
 {
-  // Map forces from f/t sensor frame to base frame
-  // y is x
-  // x is y
-  // z is -z
-  current_wrench.header.stamp = target_wrench.header.stamp;
-  current_wrench.wrench.force.x = target_wrench.wrench.force.y;
-  current_wrench.wrench.force.y = target_wrench.wrench.force.x;
-  current_wrench.wrench.force.z = -target_wrench.wrench.force.z;
-  current_wrench.wrench.torque.x = target_wrench.wrench.torque.y;
-  current_wrench.wrench.torque.y = target_wrench.wrench.torque.x;
-  current_wrench.wrench.torque.z = -target_wrench.wrench.torque.z;
+  current_wrench_.header.stamp = target_wrench.header.stamp;
+  geometry_msgs::msg::WrenchStamped force;
+  force.header.stamp = target_wrench.header.stamp;
+  force.wrench.force.x = target_wrench.wrench.force.x;
+  force.wrench.force.y = target_wrench.wrench.force.y;
+  force.wrench.force.z = target_wrench.wrench.force.z;
+  force.wrench.torque.x = target_wrench.wrench.torque.x;
+  force.wrench.torque.y = target_wrench.wrench.torque.y;
+  force.wrench.torque.z = target_wrench.wrench.torque.z;
+
+  // Map forces from probe frame to haptic base frame (since haptic base frame coincides with robot base frame)
+  try
+  {
+    auto trans = tf_buffer_->lookupTransform(base_link_name_, ft_link_name_,
+                                             tf2::TimePointZero);
+    // apply rotation to the force
+    tf2::doTransform(force, force, trans);
+
+    current_wrench_.wrench.force.x = force.wrench.force.x;
+    current_wrench_.wrench.force.y = force.wrench.force.y;
+    current_wrench_.wrench.force.z = force.wrench.force.z;
+    current_wrench_.wrench.torque.x = force.wrench.torque.x;
+    current_wrench_.wrench.torque.y = force.wrench.torque.y;
+    current_wrench_.wrench.torque.z = force.wrench.torque.z;
+  }
+  catch (tf2::TransformException &ex)
+  {
+    RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 200,
+                          "F/T sensor pose transform not available: %s", ex.what());
+    current_wrench_.wrench.force.x = current_wrench_.wrench.force.y = current_wrench_.wrench.force.z = 0.0;
+    current_wrench_.wrench.torque.x = current_wrench_.wrench.torque.y = current_wrench_.wrench.torque.z = 0.0;
+    return;
+  }
 }
-// Callback for topic out_virtuose_pose
-void HapticControl::out_virtuose_poseCB(
+// Callback for topic out_virtuose_pose_
+void HapticControl::out_virtuose_pose_CB(
     const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg)
 {
-  if (!received_haptic_pose)
+  if (!received_haptic_pose_)
   {
     // Store last pose date
-    received_haptic_pose = true;
-    haptic_starting_position.pose.position.x =
+    received_haptic_pose_ = true;
+    haptic_starting_position_.pose.position.x =
         msg->virtuose_pose.translation.x;
-    haptic_starting_position.pose.position.y =
+    haptic_starting_position_.pose.position.y =
         msg->virtuose_pose.translation.y;
-    haptic_starting_position.pose.position.z =
+    haptic_starting_position_.pose.position.z =
         msg->virtuose_pose.translation.z;
-    haptic_starting_position.pose.orientation.x =
+    haptic_starting_position_.pose.orientation.x =
         msg->virtuose_pose.rotation.x;
-    haptic_starting_position.pose.orientation.y =
+    haptic_starting_position_.pose.orientation.y =
         msg->virtuose_pose.rotation.y;
-    haptic_starting_position.pose.orientation.z =
+    haptic_starting_position_.pose.orientation.z =
         msg->virtuose_pose.rotation.z;
-    haptic_starting_position.pose.orientation.w =
+    haptic_starting_position_.pose.orientation.w =
         msg->virtuose_pose.rotation.w;
   }
-  pose_date_nanosec = msg->header.stamp.nanosec;
-  pose_date_sec = msg->header.stamp.sec;
-  cur_pose[0] = msg->virtuose_pose.translation.x;
-  cur_pose[1] = msg->virtuose_pose.translation.y;
-  cur_pose[2] = msg->virtuose_pose.translation.z;
-  cur_pose[3] = msg->virtuose_pose.rotation.x;
-  cur_pose[4] = msg->virtuose_pose.rotation.y;
-  cur_pose[5] = msg->virtuose_pose.rotation.z;
-  cur_pose[6] = msg->virtuose_pose.rotation.w;
-  // if (ctr % 1000 == 0)
+  pose_date_nanosec_ = msg->header.stamp.nanosec;
+  pose_date_sec_ = msg->header.stamp.sec;
+  cur_pose_[0] = msg->virtuose_pose.translation.x;
+  cur_pose_[1] = msg->virtuose_pose.translation.y;
+  cur_pose_[2] = msg->virtuose_pose.translation.z;
+  cur_pose_[3] = msg->virtuose_pose.rotation.x;
+  cur_pose_[4] = msg->virtuose_pose.rotation.y;
+  cur_pose_[5] = msg->virtuose_pose.rotation.z;
+  cur_pose_[6] = msg->virtuose_pose.rotation.w;
+  // if (ctr_ % 1000 == 0)
   // {
-  // printf("Virtuose pose: %f %f %f %f %f %f %f\n", cur_pose[0], cur_pose[1],
-  // cur_pose[2], cur_pose[3], cur_pose[4], cur_pose[5], cur_pose[6]);
+  // printf("Virtuose pose: %f %f %f %f %f %f %f\n", cur_pose_[0], cur_pose_[1],
+  // cur_pose_[2], cur_pose_[3], cur_pose_[4], cur_pose_[5], cur_pose_[6]);
   // }
 }
 
@@ -174,16 +199,16 @@ void HapticControl::out_virtuose_statusCB(
     const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg)
 {
   // Store last status date
-  status_date_nanosec = msg->header.stamp.nanosec;
-  status_date_sec = msg->header.stamp.sec;
-  status_state = msg->state;
-  status_button = msg->buttons;
+  status_date_nanosec_ = msg->header.stamp.nanosec;
+  status_date_sec_ = msg->header.stamp.sec;
+  status_state_ = msg->state;
+  status_button_ = msg->buttons;
 }
 
 void HapticControl::call_impedance_service()
 {
-  received_ee_pose = false;
-  while (!received_ee_pose)
+  received_ee_pose_ = false;
+  while (!received_ee_pose_)
   {
     try
     {
@@ -196,7 +221,7 @@ void HapticControl::call_impedance_service()
       ee_starting_position.pose.orientation.y = trans.transform.rotation.y;
       ee_starting_position.pose.orientation.z = trans.transform.rotation.z;
       ee_starting_position.pose.orientation.w = trans.transform.rotation.w;
-      received_ee_pose = true;
+      received_ee_pose_ = true;
     }
     catch (tf2::TransformException &ex)
     {
@@ -230,12 +255,13 @@ void HapticControl::call_impedance_service()
   imp->base_frame.translation.x = 0.0;
   imp->base_frame.translation.y = 0.0;
   imp->base_frame.translation.z = 0.0;
-  imp->base_frame.rotation.x = 0.0;
-  imp->base_frame.rotation.y = 0.0;
-  imp->base_frame.rotation.z = 0.0;
-  imp->base_frame.rotation.w = 1.0;
 
-  while (!client->wait_for_service(1s))
+  imp->base_frame.rotation.x = q_haptic_base_to_robot_base_.x();
+  imp->base_frame.rotation.y = q_haptic_base_to_robot_base_.y();
+  imp->base_frame.rotation.z = q_haptic_base_to_robot_base_.z();
+  imp->base_frame.rotation.w = q_haptic_base_to_robot_base_.w();
+
+  while (!client_->wait_for_service(1s))
   {
     if (!rclcpp::ok())
     {
@@ -247,16 +273,16 @@ void HapticControl::call_impedance_service()
                 "service not available, waiting again...");
   }
 
-  auto result = client->async_send_request(imp);
+  auto result = client_->async_send_request(imp);
   // Wait for the result.
   if (rclcpp::spin_until_future_complete(this->get_node_base_interface(),
                                          result) ==
       rclcpp::FutureReturnCode::SUCCESS)
   {
-    // Store client ID given by virtuose_node
-    client_id = result.get()->client_id;
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client ID is: %d",
-                client_id);
+    // Store client_ ID given by virtuose_node
+    client__id_ = result.get()->client_id;
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client_ ID is: %d",
+                client__id_);
   }
   else
   {
@@ -265,24 +291,24 @@ void HapticControl::call_impedance_service()
     return;
   }
 
-  if (client_id == 0)
+  if (client__id_ == 0)
   {
     RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                 "Failed to call service impedance, client_id is zero!");
+                 "Failed to call service impedance, client__id_ is zero!");
     return;
   }
 
-  ctr = 0;
+  ctr_ = 0;
 
   // Perform impedance loop at 1000 Hz
-  impedanceThread = this->create_wall_timer(
-      1ms, std::bind(&HapticControl::ImpedanceThread, this));
+  impedanceThread_ = this->create_wall_timer(
+      1ms, std::bind(&HapticControl::impedanceThread, this));
   RCLCPP_INFO(this->get_logger(), "\033[0;32mImpedance thread started\033[0m");
 }
 
-void HapticControl::ImpedanceThread()
+void HapticControl::impedanceThread()
 {
-  if (!received_haptic_pose)
+  if (!received_haptic_pose_)
   {
     return;
   }
@@ -290,28 +316,28 @@ void HapticControl::ImpedanceThread()
   raptor_api_interfaces::msg::InVirtuoseForce force;
   force.header.stamp.nanosec = get_clock()->now().nanoseconds();
   force.header.stamp.sec = get_clock()->now().seconds();
-  force.client_id = client_id;
+  force.client_id = client__id_;
   // filter noise
   float alpha = 0;
   force.virtuose_force.force.x =
-      0.3 * (alpha * old_force.virtuose_force.force.x +
-             (1 - alpha) * current_wrench.wrench.force.x);
+      0.3 * (alpha * old_force_.virtuose_force.force.x +
+             (1 - alpha) * current_wrench_.wrench.force.x);
   force.virtuose_force.force.y =
-      0.3 * (alpha * old_force.virtuose_force.force.y +
-             (1 - alpha) * current_wrench.wrench.force.y);
+      0.3 * (alpha * old_force_.virtuose_force.force.y +
+             (1 - alpha) * current_wrench_.wrench.force.y);
   force.virtuose_force.force.z =
-      0.3 * (alpha * old_force.virtuose_force.force.z +
-             (1 - alpha) * current_wrench.wrench.force.z);
+      0.3 * (alpha * old_force_.virtuose_force.force.z +
+             (1 - alpha) * current_wrench_.wrench.force.z);
   // torque omitted for control simplicity
   force.virtuose_force.torque.x =
-      0.0; // 0.2 * (alpha * old_force.virtuose_force.torque.x + (1 - alpha)
-           // * current_wrench.wrench.torque.x);
+      0.0; // 0.2 * (alpha * old_force_.virtuose_force.torque.x + (1 - alpha)
+           // * current_wrench_.wrench.torque.x);
   force.virtuose_force.torque.y =
-      0.0; // 0.2 * (alpha * old_force.virtuose_force.torque.y + (1 - alpha)
-           // * current_wrench.wrench.torque.y);
+      0.0; // 0.2 * (alpha * old_force_.virtuose_force.torque.y + (1 - alpha)
+           // * current_wrench_.wrench.torque.y);
   force.virtuose_force.torque.z =
-      0.0; // 0.2 * (alpha * old_force.virtuose_force.torque.z + (1 - alpha)
-           // * current_wrench.wrench.torque.z);
+      0.0; // 0.2 * (alpha * old_force_.virtuose_force.torque.z + (1 - alpha)
+           // * current_wrench_.wrench.torque.z);
 
   // SAFE ZONE FORCE
 
@@ -331,112 +357,84 @@ void HapticControl::ImpedanceThread()
   // std::clamp(force.virtuose_force.torque.z,-0.2,0.2);
 
   // updating old force
-  old_force.virtuose_force.force.x = force.virtuose_force.force.x;
-  old_force.virtuose_force.force.y = force.virtuose_force.force.y;
-  old_force.virtuose_force.force.z = force.virtuose_force.force.z;
-  old_force.virtuose_force.torque.x = force.virtuose_force.torque.x;
-  old_force.virtuose_force.torque.y = force.virtuose_force.torque.y;
-  old_force.virtuose_force.torque.z = force.virtuose_force.torque.z;
+  old_force_.virtuose_force.force.x = force.virtuose_force.force.x;
+  old_force_.virtuose_force.force.y = force.virtuose_force.force.y;
+  old_force_.virtuose_force.force.z = force.virtuose_force.force.z;
+  old_force_.virtuose_force.torque.x = force.virtuose_force.torque.x;
+  old_force_.virtuose_force.torque.y = force.virtuose_force.torque.y;
+  old_force_.virtuose_force.torque.z = force.virtuose_force.torque.z;
 
   _in_virtuose_force->publish(force);
-  ctr++;
+  ctr_++;
   // uint64_t dt = get_clock()->now().nanoseconds() -
-  //               (long long unsigned int)status_date_sec * 1000000000U +
-  //               (long long unsigned int)status_date_nanosec;
+  //               (long long unsigned int)status_date_sec_ * 1000000000U +
+  //               (long long unsigned int)status_date_nanosec_;
 
   // Publish target position
-  geometry_msgs::msg::PoseStamped target_pose, current_pose;
-  target_pose.header.stamp.nanosec = get_clock()->now().nanoseconds();
-  target_pose.header.stamp.sec = get_clock()->now().seconds();
-  target_pose.header.frame_id = "base_link";
+  geometry_msgs::msg::PoseStamped target_pose_, current_pose_;
+  target_pose_.header.stamp.nanosec = get_clock()->now().nanoseconds();
+  target_pose_.header.stamp.sec = get_clock()->now().seconds();
+  target_pose_.header.frame_id = base_link_name_;
 
   // computing error
   Eigen::Vector3d error;
-  error[0] = cur_pose[0] - haptic_starting_position.pose.position.x;
-  error[1] = cur_pose[1] - haptic_starting_position.pose.position.y;
-  error[2] = cur_pose[2] - haptic_starting_position.pose.position.z;
+  error[0] = cur_pose_[0] - haptic_starting_position_.pose.position.x;
+  error[1] = cur_pose_[1] - haptic_starting_position_.pose.position.y;
+  error[2] = cur_pose_[2] - haptic_starting_position_.pose.position.z;
 
   // applying rotation from haptic base frame to robot base frame
-  error = q_haptic_base_to_robot_base_.toRotationMatrix() * error;
+  // error = q_haptic_base_to_robot_base_.toRotationMatrix() * error;
 
-  target_pose.pose.position.x =
+  target_pose_.pose.position.x =
       ee_starting_position.pose.position.x + error(0);
-  target_pose.pose.position.y =
+  target_pose_.pose.position.y =
       ee_starting_position.pose.position.y + error(1);
-  target_pose.pose.position.z =
+  target_pose_.pose.position.z =
       ee_starting_position.pose.position.z + error(2);
 
   // eigen quat order is w x y z
-  Eigen::Quaterniond qStart(haptic_starting_position.pose.orientation.w,
-                            haptic_starting_position.pose.orientation.x,
-                            haptic_starting_position.pose.orientation.y,
-                            haptic_starting_position.pose.orientation.z);
-  Eigen::Quaterniond qCur(cur_pose[6], cur_pose[3], cur_pose[4], cur_pose[5]);
+  Eigen::Quaterniond qStart(haptic_starting_position_.pose.orientation.w,
+                            haptic_starting_position_.pose.orientation.x,
+                            haptic_starting_position_.pose.orientation.y,
+                            haptic_starting_position_.pose.orientation.z);
+  Eigen::Quaterniond qCur(cur_pose_[6], cur_pose_[3], cur_pose_[4], cur_pose_[5]);
   Eigen::Quaterniond qEEStart(ee_starting_position.pose.orientation.w,
                               ee_starting_position.pose.orientation.x,
                               ee_starting_position.pose.orientation.y,
                               ee_starting_position.pose.orientation.z);
 
   // transform back to quaternion
-  current_pose.header.frame_id = "base_link";
-  current_pose.pose.position.x = target_pose.pose.position.x;
-  current_pose.pose.position.y = target_pose.pose.position.y;
-  current_pose.pose.position.z = target_pose.pose.position.z;
+  current_pose_.header.frame_id = base_link_name_;
+  current_pose_.pose.position.x = target_pose_.pose.position.x;
+  current_pose_.pose.position.y = target_pose_.pose.position.y;
+  current_pose_.pose.position.z = target_pose_.pose.position.z;
 
   // SAFE ZONE POSITION
-  current_pose.pose.position.x = std::clamp(current_pose.pose.position.x, min_x, max_x);
-  current_pose.pose.position.y = std::clamp(current_pose.pose.position.y, min_y, max_y);
-  current_pose.pose.position.z = std::clamp(current_pose.pose.position.z, min_z, max_z);
+  current_pose_.pose.position.x = std::clamp(current_pose_.pose.position.x, min_x_, max_x_);
+  current_pose_.pose.position.y = std::clamp(current_pose_.pose.position.y, min_y_, max_y_);
+  current_pose_.pose.position.z = std::clamp(current_pose_.pose.position.z, min_z_, max_z_);
 
-  // rotation from haptic base frame to robot base frame
-
-  // qCur = qRotB * qCur;
-  // qCur.normalize();
-
-  // // rotations to go from base frame to end effector frame
-  // Eigen::Quaterniond qRotX(0.0, 1.0, 0.0, 0.0);
-  // Eigen::Quaterniond qRotX(Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX()));
-  // Eigen::Quaterniond qRotY(Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
-
-  // Eigen::Quaterniond qRotX(Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()));
-  // Eigen::Quaterniond qRotY(Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
-
-  // qCur = qRotX * qCur;
-  // qCur.normalize();
-  // qCur = qRotY * qCur;
-  // qCur.normalize();
-
-  // qStart = qRotX * qStart;
-  // qStart.normalize();
-  // qStart = qRotY * qStart;
-  // qStart.normalize();
-
-  // Now qStart and qCur are expressed in the base frame,
-  current_pose.pose.orientation.x = qCur.x();
-  current_pose.pose.orientation.y = qCur.y();
-  current_pose.pose.orientation.z = qCur.z();
-  current_pose.pose.orientation.w = qCur.w();
-  current_target_pos_publisher_->publish(current_pose);
+  current_pose_.pose.orientation.x = qCur.x();
+  current_pose_.pose.orientation.y = qCur.y();
+  current_pose_.pose.orientation.z = qCur.z();
+  current_pose_.pose.orientation.w = qCur.w();
+  current_target_pos_publisher_->publish(current_pose_);
 
   // computing the difference between the current orientation and the starting
   // orientation of the haptic device
-  Eigen::Quaterniond qDiff = qCur.conjugate() * qStart;
+  Eigen::Quaterniond qDiff = qCur * qStart.conjugate();
   qDiff.normalize();
 
-  // transform the rotation error to the robot base frame
-  qDiff = q_haptic_base_to_robot_base_ * qDiff * q_haptic_base_to_robot_base_.conjugate();
-
   // applying delta rotation to the end effector starting orientation
-  Eigen::Quaterniond qTarget = qDiff.conjugate() * qEEStart;
+  Eigen::Quaterniond qTarget = qDiff * qEEStart;
   qTarget.normalize();
 
-  target_pose.pose.orientation.x = qTarget.x();
-  target_pose.pose.orientation.y = qTarget.y();
-  target_pose.pose.orientation.z = qTarget.z();
-  target_pose.pose.orientation.w = qTarget.w();
+  target_pose_.pose.orientation.x = qTarget.x();
+  target_pose_.pose.orientation.y = qTarget.y();
+  target_pose_.pose.orientation.z = qTarget.z();
+  target_pose_.pose.orientation.w = qTarget.w();
 
-  // publish
-  target_pos_publisher_->publish(target_pose);
+  target_pos_publisher_->publish(target_pose_);
 }
 
 int main(int argc, char **argv)

@@ -84,7 +84,7 @@ Finally run
 ```
 # Trouble shooting
 - If you get this error `HAPTION::RaptorAPI::StartLogging() failed with error 13` you probably did not sourced `entrypoint.sh`
-
+- If you get `HAPTION::RaptorAPI::StartLogging() failed with error 1` the haptic interface is probably shutted down
     
     
     

@@ -632,6 +632,7 @@ private:
             state = STATE_ERROR;
             return false;
         }
+        RCLCPP_INFO_STREAM(rclcpp::get_logger("rclcpp"), "Base frame set to: " << baseAPI.t_x << " " << baseAPI.t_y << " " << baseAPI.t_z << " | " << baseAPI.q_x << " " << baseAPI.q_y << " " << baseAPI.q_z << " " << baseAPI.q_w);
         // Display successful connection
         std::string robotName{""};
         (void)raptorHandle.GetFullName(robotName);
@@ -772,7 +773,6 @@ private:
         raptorHandle.GetOperatorButton(HAPTION::OperatorButton::B_STOP, emergency_stop);
 
         status.buttons = ((button[0]) ? 1 : 0) + ((button[1]) ? 2 : 0);
-
         status.emergency_stop = (emergency_stop);
         outVirtuoseStatusPublisher->publish(status);
 
