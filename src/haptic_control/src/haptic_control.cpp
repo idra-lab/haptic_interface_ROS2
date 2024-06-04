@@ -310,6 +310,8 @@ void HapticControl::impedanceThread()
 {
   if (!received_haptic_pose_)
   {
+    RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                          "Haptic pose not available");
     return;
   }
   // Apply the force
