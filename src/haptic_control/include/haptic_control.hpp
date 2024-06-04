@@ -38,8 +38,8 @@ public:
                       rclcpp::NodeOptions()
                           .allow_undeclared_parameters(true)
                           .automatically_declare_parameters_from_overrides(true));
-    void bounding_box_CB(const rclcpp::Parameter &p);
-    void scaling_factor__CB(const rclcpp::Parameter &p);
+    void enable_safety_sphere_CB(const rclcpp::Parameter &p);
+    void set_safety_sphere_radius_CB(const rclcpp::Parameter &p);
     void update_current_ee_pos();
     void SetWrenchCB(const geometry_msgs::msg::WrenchStamped target_wrench);
     void out_virtuose_pose_CB(
@@ -48,7 +48,7 @@ public:
         const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg);
     void call_impedance_service();
     void impedanceThread();
-
+    void project_target_on_sphere(Eigen::Vector3d &target_position_vec, double safety_sphere_radius_);
 private:
     // ROS2 subscribtions
     rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuoseStatus>::SharedPtr
@@ -74,28 +74,28 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     // ROS2 params callbacks
     std::shared_ptr<rclcpp::ParameterEventHandler> param_subscriber_;
-    std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_handle_bounding_box_;
-    std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_scaling_factor__box_;
+    std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_enable_safety_sphere_;
+    std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_safety_sphere_radius_;
 
     geometry_msgs::msg::WrenchStamped current_wrench_;
     geometry_msgs::msg::PoseStamped target_pose_;
-    geometry_msgs::msg::PoseStamped current_pose_;
+    geometry_msgs::msg::PoseStamped old_pose_,current_pose_;
     geometry_msgs::msg::PoseStamped ee_starting_position;
     geometry_msgs::msg::PoseStamped ee_current_pose_;
     geometry_msgs::msg::PoseStamped haptic_starting_position_;
     Eigen::Quaterniond q_haptic_base_to_robot_base_;
     raptor_api_interfaces::msg::InVirtuoseForce old_force_;
-    double scaling_factor_;
+    double safety_sphere_radius_;
     double min_x_, max_x_, min_y_, max_y_, min_z_, max_z_;
     double max_force_;
     double force_scale_;
     std::string tool_link_name_;
     std::string base_link_name_;
     std::string ft_link_name_;
-    bool use_bounding_box_;
     bool received_haptic_pose_;
     bool received_ee_pose_;
-    bool use_limits;
+    bool use_limits_;
+    bool enable_safety_sphere_;
     // Storage for virtuose_node status
     int64_t status_date_sec_;
     uint32_t status_date_nanosec_;
@@ -108,6 +108,11 @@ private:
     std::array<double, 3> bounding_box_center_;
     uint32_t status_state_;
     uint32_t status_button_;
+
+    // current and old hapitc positions
+    Eigen::Vector3d x_new_, x_old_;
+    // current and old haptic displacements
+    Eigen::Vector3d x_tilde_old_, x_tilde_new_;    
 };
 
 #endif // HAPTIC_CONTROL_HPP

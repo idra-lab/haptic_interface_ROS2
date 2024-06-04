@@ -12,13 +12,17 @@ HapticControl::HapticControl(const std::string &name,
                              const rclcpp::NodeOptions &options)
     : Node(name, namespace_, options)
 {
-  this->declare_parameter("scaling_factor_", 1.0);
-
-  // safety XYZ position zone -> default
-  this->use_bounding_box_ = this->get_parameter("use_bounding_box_").as_bool();
-  // safety XYZ position zone -> default
-  this->use_limits = this->get_parameter("use_limits").as_bool();
-
+  // safety sphere around robot base link to prevent singularity
+  this->enable_safety_sphere_ = this->get_parameter("enable_safety_sphere").as_bool();
+  if (this->enable_safety_sphere_)
+  {
+    this->safety_sphere_radius_ = this->get_parameter("safety_sphere_radius").as_double();
+    this->safety_sphere_radius_ = std::clamp(this->safety_sphere_radius_, 0.0, 2.0);
+  }
+  else
+  {
+    this->safety_sphere_radius_ = 100.0;
+  }
   // this->declare_parameter("min_x_", -1.0);
   this->min_x_ = this->get_parameter("min_x").as_double();
   // this->declare_parameter("max_x_", 1.0);
@@ -81,12 +85,13 @@ HapticControl::HapticControl(const std::string &name,
       "virtuose_impedance");
 
   // Set a callback for this node's parameters, i.e.: "bounding_box", etc.
-  cb_handle_bounding_box_ = param_subscriber_->add_parameter_callback(
-      "bounding_box",
-      std::bind(&HapticControl::bounding_box_CB, this, std::placeholders::_1));
-  cb_scaling_factor__box_ = param_subscriber_->add_parameter_callback(
-      "scaling_factor", std::bind(&HapticControl::scaling_factor__CB, this,
-                                   std::placeholders::_1));
+  cb_enable_safety_sphere_ = param_subscriber_->add_parameter_callback(
+      "safety_sphere",
+      std::bind(&HapticControl::enable_safety_sphere_CB, this, std::placeholders::_1));
+
+  cb_safety_sphere_radius_ = param_subscriber_->add_parameter_callback(
+      "scaling_factor", std::bind(&HapticControl::set_safety_sphere_radius_CB, this,
+                                  std::placeholders::_1));
   received_haptic_pose_ = false;
 
   // Initializes the TF2 transform listener and buffer
@@ -94,28 +99,27 @@ HapticControl::HapticControl(const std::string &name,
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
   // defines the rotation from the robot base frame to the haptic base frame
-  Eigen::Quaterniond tmp(Eigen::AngleAxisd(M_PI/2, Eigen::Vector3d::UnitZ()));
+  Eigen::Quaterniond tmp(Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
   q_haptic_base_to_robot_base_.x() = tmp.x();
   q_haptic_base_to_robot_base_.y() = tmp.y();
   q_haptic_base_to_robot_base_.z() = tmp.z();
   q_haptic_base_to_robot_base_.w() = tmp.w();
+
+  x_new_ << 0.0, 0.0, 0.0;
+  x_old_ << 0.0, 0.0, 0.0;
+  x_tilde_new_ << 0.0, 0.0, 0.0;
+  x_tilde_old_ << 0.0, 0.0, 0.0;
 }
 // Dedicated function to handle parameter updates
-void HapticControl::bounding_box_CB(const rclcpp::Parameter &p)
+void HapticControl::enable_safety_sphere_CB(const rclcpp::Parameter &p)
 {
-  RCLCPP_INFO(this->get_logger(), "Toggled BOUNDING BOX");
-
-  use_bounding_box_ = (bool)p.as_int();
-
-  bounding_box_center_[0] = target_pose_.pose.position.x;
-  bounding_box_center_[1] = target_pose_.pose.position.y;
-  bounding_box_center_[2] = target_pose_.pose.position.z;
+  RCLCPP_INFO(this->get_logger(), "Toggled Safety sphere");
+  enable_safety_sphere_ = (bool)p.as_int();
 }
-void HapticControl::scaling_factor__CB(const rclcpp::Parameter &p)
+void HapticControl::set_safety_sphere_radius_CB(const rclcpp::Parameter &p)
 {
-  RCLCPP_INFO(this->get_logger(), "Received an update to the scaling factor");
-
-  scaling_factor_ = std::clamp(p.as_double(), 0.0, 1.0);
+  RCLCPP_INFO(this->get_logger(), "Received an update to the safety sphere radius");
+  safety_sphere_radius_ = std::clamp(p.as_double(), 0.0, 2.0);
 }
 
 void HapticControl::SetWrenchCB(
@@ -177,6 +181,10 @@ void HapticControl::out_virtuose_pose_CB(
         msg->virtuose_pose.rotation.z;
     haptic_starting_position_.pose.orientation.w =
         msg->virtuose_pose.rotation.w;
+    x_new_ << haptic_starting_position_.pose.position.x,
+        haptic_starting_position_.pose.position.y,
+        haptic_starting_position_.pose.position.z;
+    x_old_ = x_new_;
   }
   pose_date_nanosec_ = msg->header.stamp.nanosec;
   pose_date_sec_ = msg->header.stamp.sec;
@@ -187,6 +195,20 @@ void HapticControl::out_virtuose_pose_CB(
   cur_pose_[4] = msg->virtuose_pose.rotation.y;
   cur_pose_[5] = msg->virtuose_pose.rotation.z;
   cur_pose_[6] = msg->virtuose_pose.rotation.w;
+
+  x_old_ = x_new_;
+  x_new_ << cur_pose_[0], cur_pose_[1], cur_pose_[2];
+
+  // ENFORCE SPHERE SAFETY
+  if (enable_safety_sphere_)
+  {
+    x_tilde_new_ = x_tilde_old_ + (x_new_ - x_old_);
+  }
+  else
+  {
+    x_tilde_new_ = x_new_;
+  }
+
   // if (ctr_ % 1000 == 0)
   // {
   // printf("Virtuose pose: %f %f %f %f %f %f %f\n", cur_pose_[0], cur_pose_[1],
@@ -380,9 +402,9 @@ void HapticControl::impedanceThread()
 
   // computing error
   Eigen::Vector3d error;
-  error[0] = cur_pose_[0] - haptic_starting_position_.pose.position.x;
-  error[1] = cur_pose_[1] - haptic_starting_position_.pose.position.y;
-  error[2] = cur_pose_[2] - haptic_starting_position_.pose.position.z;
+  error[0] = x_tilde_new_[0] - haptic_starting_position_.pose.position.x;
+  error[1] = x_tilde_new_[1] - haptic_starting_position_.pose.position.y;
+  error[2] = x_tilde_new_[2] - haptic_starting_position_.pose.position.z;
 
   // applying rotation from haptic base frame to robot base frame
   // error = q_haptic_base_to_robot_base_.toRotationMatrix() * error;
@@ -393,6 +415,26 @@ void HapticControl::impedanceThread()
       ee_starting_position.pose.position.y + error(1);
   target_pose_.pose.position.z =
       ee_starting_position.pose.position.z + error(2);
+
+  if (enable_safety_sphere_)
+  {
+    Eigen::Vector3d target_position_vec(target_pose_.pose.position.x,
+                                        target_pose_.pose.position.y,
+                                        target_pose_.pose.position.z);
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                         "Current distance: %f, safety sphere radius: %f", target_position_vec.norm(),
+                         safety_sphere_radius_);
+    if (target_position_vec.norm() > safety_sphere_radius_)
+    {
+      // project the target on the safety sphere to prevent singularities
+      project_target_on_sphere(target_position_vec, safety_sphere_radius_);
+    }
+    else
+    {
+      // update the old pose only if the target is within the safety sphere
+      x_tilde_old_ = x_tilde_new_;
+    }
+  }
 
   // eigen quat order is w x y z
   Eigen::Quaterniond qStart(haptic_starting_position_.pose.orientation.w,
@@ -406,21 +448,21 @@ void HapticControl::impedanceThread()
                               ee_starting_position.pose.orientation.z);
 
   // transform back to quaternion
-  current_pose_.header.frame_id = base_link_name_;
-  current_pose_.pose.position.x = target_pose_.pose.position.x;
-  current_pose_.pose.position.y = target_pose_.pose.position.y;
-  current_pose_.pose.position.z = target_pose_.pose.position.z;
+  // current_pose_.header.frame_id = base_link_name_;
+  // current_pose_.pose.position.x = target_pose_.pose.position.x;
+  // current_pose_.pose.position.y = target_pose_.pose.position.y;
+  // current_pose_.pose.position.z = target_pose_.pose.position.z;
 
-  // SAFE ZONE POSITION
-  current_pose_.pose.position.x = std::clamp(current_pose_.pose.position.x, min_x_, max_x_);
-  current_pose_.pose.position.y = std::clamp(current_pose_.pose.position.y, min_y_, max_y_);
-  current_pose_.pose.position.z = std::clamp(current_pose_.pose.position.z, min_z_, max_z_);
+  // // SAFE ZONE POSITION
+  // current_pose_.pose.position.x = std::clamp(current_pose_.pose.position.x, min_x_, max_x_);
+  // current_pose_.pose.position.y = std::clamp(current_pose_.pose.position.y, min_y_, max_y_);
+  // current_pose_.pose.position.z = std::clamp(current_pose_.pose.position.z, min_z_, max_z_);
 
-  current_pose_.pose.orientation.x = qCur.x();
-  current_pose_.pose.orientation.y = qCur.y();
-  current_pose_.pose.orientation.z = qCur.z();
-  current_pose_.pose.orientation.w = qCur.w();
-  current_target_pos_publisher_->publish(current_pose_);
+  // current_pose_.pose.orientation.x = qCur.x();
+  // current_pose_.pose.orientation.y = qCur.y();
+  // current_pose_.pose.orientation.z = qCur.z();
+  // current_pose_.pose.orientation.w = qCur.w();
+  // current_target_pos_publisher_->publish(current_pose_);
 
   // computing the difference between the current orientation and the starting
   // orientation of the haptic device
@@ -438,7 +480,10 @@ void HapticControl::impedanceThread()
 
   target_pos_publisher_->publish(target_pose_);
 }
-
+void HapticControl::project_target_on_sphere(Eigen::Vector3d &target_position_vec, double safety_sphere_radius_)
+{
+  target_position_vec = target_position_vec.normalized() * safety_sphere_radius_;
+}
 int main(int argc, char **argv)
 {
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting Haptic Control node");

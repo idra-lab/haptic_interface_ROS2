@@ -6,7 +6,8 @@ haptic_control:
     local_ip_address: "192.168.100.50"
     max_force_: 6.0
     # robot position safety limits
-    use_bounding_box_: false
+    enable_safety_sphere: true
+    safety_sphere_radius: 0.48
     use_limits: false
     min_x:  -100.0
     max_x:  100.0
