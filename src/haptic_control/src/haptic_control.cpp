@@ -251,6 +251,17 @@ void HapticControl::call_impedance_service()
                             "End Effector pose not available: %s", ex.what());
     }
   }
+  if (enable_safety_sphere_)
+  {
+    Eigen::Vector3d ee_start(ee_starting_position.pose.position.x,
+                             ee_starting_position.pose.position.y,
+                             ee_starting_position.pose.position.z);
+    if (ee_start.norm() > safety_sphere_radius_)
+    {
+      RCLCPP_ERROR(this->get_logger(), "ERROR: End effector is outside the safety sphere, please move it inside the safety sphere");
+      exit(1);
+    }
+  }
   RCLCPP_INFO(this->get_logger(),
               "\n\nEnd Effector Pose received \nEE starting position is : x: "
               "%f | y: %f | z: %f | \nEE starting rotation is : x: %f | y: "
