@@ -8,6 +8,7 @@
 #include <Eigen/Geometry>
 #include <chrono>
 #include <memory>
+#include <limits>
 #include <rclcpp/parameter_event_handler.hpp>
 #include <rclcpp/rclcpp.hpp>
 

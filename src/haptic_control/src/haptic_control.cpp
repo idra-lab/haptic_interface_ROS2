@@ -1,6 +1,5 @@
 #include "haptic_control.hpp"
-#include "tf2/convert.h"
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+
 using namespace Eigen;
 
 using std::placeholders::_1;
@@ -21,7 +20,7 @@ HapticControl::HapticControl(const std::string &name,
   }
   else
   {
-    this->safety_sphere_radius_ = 100.0;
+    this->safety_sphere_radius_ = std::numeric_limits<double>::infinity();
   }
   // this->declare_parameter("min_x_", -1.0);
   this->min_x_ = this->get_parameter("min_x").as_double();
