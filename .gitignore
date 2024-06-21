@@ -2,10 +2,7 @@ install/
 build/
 log/
 .vscode/*
-<<<<<<< HEAD
-=======
 .vscode/
->>>>>>> cea694ec0ea1839c794153a3984c05e169eb5365
 .vscode
 !.vscode/settings.json
 !.vscode/tasks.json

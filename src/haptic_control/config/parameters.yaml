@@ -26,3 +26,8 @@ haptic_control:
     base_link_name: "base_link"
     ft_link_name: "ft_sensor0_wrench"
     force_scale : 0.3
+    # safety box that can be activated (centered in the current ee position)
+    enable_safety_box: false 
+    safety_box_length: 0.2
+    safety_box_width: 0.2
+    safety_box_height: 0.2

@@ -9,31 +9,29 @@ using namespace std::chrono_literals;
 HapticControl::HapticControl(const std::string &name,
                              const std::string &namespace_,
                              const rclcpp::NodeOptions &options)
-    : Node(name, namespace_, options)
-{
+    : Node(name, namespace_, options) {
   // safety sphere around robot base link to prevent singularity
-  this->enable_safety_sphere_ = this->get_parameter("enable_safety_sphere").as_bool();
-  if (this->enable_safety_sphere_)
-  {
-    this->safety_sphere_radius_ = this->get_parameter("safety_sphere_radius").as_double();
-    this->safety_sphere_radius_ = std::clamp(this->safety_sphere_radius_, 0.0, 2.0);
-  }
-  else
-  {
+  this->enable_safety_sphere_ =
+      this->get_parameter("enable_safety_sphere").as_bool();
+  if (this->enable_safety_sphere_) {
+    this->safety_sphere_radius_ =
+        this->get_parameter("safety_sphere_radius").as_double();
+    this->safety_sphere_radius_ =
+        std::clamp(this->safety_sphere_radius_, 0.0, 2.0);
+  } else {
     this->safety_sphere_radius_ = std::numeric_limits<double>::infinity();
   }
-  // this->declare_parameter("min_x_", -1.0);
-  this->min_x_ = this->get_parameter("min_x").as_double();
-  // this->declare_parameter("max_x_", 1.0);
-  this->max_x_ = this->get_parameter("max_x").as_double();
-  // this->declare_parameter("min_y_", -1.0);
-  this->min_y_ = this->get_parameter("min_y").as_double();
-  // this->declare_parameter("max_y_", 1.0);
-  this->max_y_ = this->get_parameter("max_y").as_double();
-  // this->declare_parameter("min_z_", -1.0);
-  this->min_z_ = this->get_parameter("min_z").as_double();
-  // this->declare_parameter("max_z_", 1.0);
-  this->max_z_ = this->get_parameter("max_z").as_double();
+  // safety box dimension
+  this->enable_safety_box_ = this->get_parameter("enable_safety_box").as_bool();
+  if (this->enable_safety_box_) {
+    this->safety_box_width_ = this->get_parameter("safety_box_width").as_double();   // x
+    this->safety_box_length_ = this->get_parameter("safety_box_length").as_double(); // y
+    this->safety_box_height_ = this->get_parameter("safety_box_height").as_double(); // z
+  } else {
+    this->safety_box_width_ = std::numeric_limits<double>::infinity();
+    this->safety_box_length_ = std::numeric_limits<double>::infinity();
+    this->safety_box_height_ = std::numeric_limits<double>::infinity();
+  }
 
   this->get_parameter("max_force_", max_force_);
   // safety XYZ position zone -> read from config file
@@ -56,10 +54,10 @@ HapticControl::HapticControl(const std::string &name,
   current_wrench_.wrench.torque.z = 0.0;
 
   // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preparing publishers");
-  out_virtuose_status_ = this->create_subscription<
-      raptor_api_interfaces::msg::OutVirtuoseStatus>(
-      "out_virtuose_status", 1,
-      std::bind(&HapticControl::out_virtuose_statusCB, this, _1));
+  out_virtuose_status_ =
+      this->create_subscription<raptor_api_interfaces::msg::OutVirtuoseStatus>(
+          "out_virtuose_status", 1,
+          std::bind(&HapticControl::out_virtuose_statusCB, this, _1));
   _out_virtuose_pose_ =
       this->create_subscription<raptor_api_interfaces::msg::OutVirtuosePose>(
           "out_virtuose_pose", 1,
@@ -69,8 +67,8 @@ HapticControl::HapticControl(const std::string &name,
       this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                               1);
   current_target_pos_publisher_ =
-      this->create_publisher<geometry_msgs::msg::PoseStamped>(
-          "current_frame", 1);
+      this->create_publisher<geometry_msgs::msg::PoseStamped>("current_frame",
+                                                              1);
 
   _in_virtuose_force =
       this->create_publisher<raptor_api_interfaces::msg::InVirtuoseForce>(
@@ -83,14 +81,29 @@ HapticControl::HapticControl(const std::string &name,
   client_ = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
       "virtuose_impedance");
 
-  // Set a callback for this node's parameters, i.e.: "bounding_box", etc.
+  // Set a callback for parameters updates
+  // Safety sphere
   cb_enable_safety_sphere_ = param_subscriber_->add_parameter_callback(
-      "safety_sphere",
-      std::bind(&HapticControl::enable_safety_sphere_CB, this, std::placeholders::_1));
-
+      "enable_safety_sphere", std::bind(&HapticControl::enable_safety_sphere_CB,
+                                        this, std::placeholders::_1));
   cb_safety_sphere_radius_ = param_subscriber_->add_parameter_callback(
-      "scaling_factor", std::bind(&HapticControl::set_safety_sphere_radius_CB, this,
-                                  std::placeholders::_1));
+      "safety_sphere_radius", std::bind(&HapticControl::set_safety_sphere_radius_CB,
+                                  this, std::placeholders::_1));
+  // Safety box
+  cb_enable_safety_box_ = param_subscriber_->add_parameter_callback(
+      "enable_safety_box", std::bind(&HapticControl::enable_safety_box_CB,
+                                        this, std::placeholders::_1));
+  cb_safety_box_width_ = param_subscriber_->add_parameter_callback(
+      "safety_box_width", std::bind(&HapticControl::set_safety_box_width_CB,
+                                    this, std::placeholders::_1));
+  cb_safety_box_length_ = param_subscriber_->add_parameter_callback(
+      "safety_box_length", std::bind(&HapticControl::set_safety_box_length_CB,
+                                     this, std::placeholders::_1));
+  cb_safety_box_height_ = param_subscriber_->add_parameter_callback(
+      "safety_box_height", std::bind(&HapticControl::set_safety_box_height_CB,
+                                     this, std::placeholders::_1));                                     
+
+
   received_haptic_pose_ = false;
 
   // Initializes the TF2 transform listener and buffer
@@ -109,21 +122,37 @@ HapticControl::HapticControl(const std::string &name,
   x_tilde_new_ << 0.0, 0.0, 0.0;
   x_tilde_old_ << 0.0, 0.0, 0.0;
 }
-// Dedicated function to handle parameter updates
-void HapticControl::enable_safety_sphere_CB(const rclcpp::Parameter &p)
-{
+
+void HapticControl::enable_safety_sphere_CB(const rclcpp::Parameter &p) {
   RCLCPP_INFO(this->get_logger(), "Toggled Safety sphere");
   enable_safety_sphere_ = (bool)p.as_int();
 }
-void HapticControl::set_safety_sphere_radius_CB(const rclcpp::Parameter &p)
-{
-  RCLCPP_INFO(this->get_logger(), "Received an update to the safety sphere radius");
+void HapticControl::set_safety_sphere_radius_CB(const rclcpp::Parameter &p) {
+  RCLCPP_INFO(this->get_logger(),
+              "Received an update to the safety sphere radius");
   safety_sphere_radius_ = std::clamp(p.as_double(), 0.0, 2.0);
+}
+void HapticControl::enable_safety_box_CB(const rclcpp::Parameter &p) {
+  RCLCPP_INFO(this->get_logger(), "Toggled Safety box");
+  enable_safety_box_ = (bool)p.as_int();
+}
+void HapticControl::set_safety_box_width_CB(const rclcpp::Parameter &p) {
+  RCLCPP_INFO(this->get_logger(), "Received an update to the safety box width");
+  safety_box_width_ = std::clamp(p.as_double(), 0.0, 2.0);
+}
+void HapticControl::set_safety_box_length_CB(const rclcpp::Parameter &p) {
+  RCLCPP_INFO(this->get_logger(),
+              "Received an update to the safety box length");
+  safety_box_length_ = std::clamp(p.as_double(), 0.0, 2.0);
+}
+void HapticControl::set_safety_box_height_CB(const rclcpp::Parameter &p) {
+  RCLCPP_INFO(this->get_logger(),
+              "Received an update to the safety box height");
+  safety_box_height_ = std::clamp(p.as_double(), 0.0, 2.0);
 }
 
 void HapticControl::SetWrenchCB(
-    const geometry_msgs::msg::WrenchStamped target_wrench)
-{
+    const geometry_msgs::msg::WrenchStamped target_wrench) {
   current_wrench_.header.stamp = target_wrench.header.stamp;
   geometry_msgs::msg::WrenchStamped force;
   force.header.stamp = target_wrench.header.stamp;
@@ -134,9 +163,9 @@ void HapticControl::SetWrenchCB(
   force.wrench.torque.y = target_wrench.wrench.torque.y;
   force.wrench.torque.z = target_wrench.wrench.torque.z;
 
-  // Map forces from probe frame to haptic base frame (since haptic base frame coincides with robot base frame)
-  try
-  {
+  // Map forces from probe frame to haptic base frame (since haptic base frame
+  // coincides with robot base frame)
+  try {
     auto trans = tf_buffer_->lookupTransform(base_link_name_, ft_link_name_,
                                              tf2::TimePointZero);
     // apply rotation to the force
@@ -148,22 +177,21 @@ void HapticControl::SetWrenchCB(
     current_wrench_.wrench.torque.x = force.wrench.torque.x;
     current_wrench_.wrench.torque.y = force.wrench.torque.y;
     current_wrench_.wrench.torque.z = force.wrench.torque.z;
-  }
-  catch (tf2::TransformException &ex)
-  {
+  } catch (tf2::TransformException &ex) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 200,
-                          "F/T sensor pose transform not available: %s", ex.what());
-    current_wrench_.wrench.force.x = current_wrench_.wrench.force.y = current_wrench_.wrench.force.z = 0.0;
-    current_wrench_.wrench.torque.x = current_wrench_.wrench.torque.y = current_wrench_.wrench.torque.z = 0.0;
+                          "F/T sensor pose transform not available: %s",
+                          ex.what());
+    current_wrench_.wrench.force.x = current_wrench_.wrench.force.y =
+        current_wrench_.wrench.force.z = 0.0;
+    current_wrench_.wrench.torque.x = current_wrench_.wrench.torque.y =
+        current_wrench_.wrench.torque.z = 0.0;
     return;
   }
 }
 // Callback for topic out_virtuose_pose_
 void HapticControl::out_virtuose_pose_CB(
-    const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg)
-{
-  if (!received_haptic_pose_)
-  {
+    const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg) {
+  if (!received_haptic_pose_) {
     // Store last pose date
     received_haptic_pose_ = true;
     haptic_starting_position_.pose.position.x =
@@ -199,12 +227,9 @@ void HapticControl::out_virtuose_pose_CB(
   x_new_ << cur_pose_[0], cur_pose_[1], cur_pose_[2];
 
   // ENFORCE SPHERE SAFETY
-  if (enable_safety_sphere_)
-  {
+  if (enable_safety_sphere_) {
     x_tilde_new_ = x_tilde_old_ + (x_new_ - x_old_);
-  }
-  else
-  {
+  } else {
     x_tilde_new_ = x_new_;
   }
 
@@ -217,8 +242,7 @@ void HapticControl::out_virtuose_pose_CB(
 
 // Callback for topic out_virtuose_status
 void HapticControl::out_virtuose_statusCB(
-    const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg)
-{
+    const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg) {
   // Store last status date
   status_date_nanosec_ = msg->header.stamp.nanosec;
   status_date_sec_ = msg->header.stamp.sec;
@@ -226,13 +250,10 @@ void HapticControl::out_virtuose_statusCB(
   status_button_ = msg->buttons;
 }
 
-void HapticControl::call_impedance_service()
-{
+void HapticControl::call_impedance_service() {
   received_ee_pose_ = false;
-  while (!received_ee_pose_)
-  {
-    try
-    {
+  while (!received_ee_pose_) {
+    try {
       auto trans = tf_buffer_->lookupTransform(base_link_name_, tool_link_name_,
                                                tf2::TimePointZero);
       ee_starting_position.pose.position.x = trans.transform.translation.x;
@@ -243,21 +264,19 @@ void HapticControl::call_impedance_service()
       ee_starting_position.pose.orientation.z = trans.transform.rotation.z;
       ee_starting_position.pose.orientation.w = trans.transform.rotation.w;
       received_ee_pose_ = true;
-    }
-    catch (tf2::TransformException &ex)
-    {
+    } catch (tf2::TransformException &ex) {
       RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                             "End Effector pose not available: %s", ex.what());
     }
   }
-  if (enable_safety_sphere_)
-  {
+  if (enable_safety_sphere_) {
     Eigen::Vector3d ee_start(ee_starting_position.pose.position.x,
                              ee_starting_position.pose.position.y,
                              ee_starting_position.pose.position.z);
-    if (ee_start.norm() > safety_sphere_radius_)
-    {
-      RCLCPP_ERROR(this->get_logger(), "ERROR: End effector is outside the safety sphere, please move it inside the safety sphere");
+    if (ee_start.norm() > safety_sphere_radius_) {
+      RCLCPP_ERROR(this->get_logger(),
+                   "ERROR: End effector is outside the safety sphere, please "
+                   "move it inside the safety sphere");
       exit(1);
     }
   }
@@ -293,10 +312,8 @@ void HapticControl::call_impedance_service()
   imp->base_frame.rotation.z = q_haptic_base_to_robot_base_.z();
   imp->base_frame.rotation.w = q_haptic_base_to_robot_base_.w();
 
-  while (!client_->wait_for_service(1s))
-  {
-    if (!rclcpp::ok())
-    {
+  while (!client_->wait_for_service(1s)) {
+    if (!rclcpp::ok()) {
       RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                    "Interrupted while waiting for the service. Exiting.");
       return;
@@ -309,22 +326,18 @@ void HapticControl::call_impedance_service()
   // Wait for the result.
   if (rclcpp::spin_until_future_complete(this->get_node_base_interface(),
                                          result) ==
-      rclcpp::FutureReturnCode::SUCCESS)
-  {
+      rclcpp::FutureReturnCode::SUCCESS) {
     // Store client_ ID given by virtuose_node
     client__id_ = result.get()->client_id;
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client_ ID is: %d",
                 client__id_);
-  }
-  else
-  {
+  } else {
     RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                  "Failed to call service impedance");
     return;
   }
 
-  if (client__id_ == 0)
-  {
+  if (client__id_ == 0) {
     RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                  "Failed to call service impedance, client__id_ is zero!");
     return;
@@ -338,10 +351,8 @@ void HapticControl::call_impedance_service()
   RCLCPP_INFO(this->get_logger(), "\033[0;32mImpedance thread started\033[0m");
 }
 
-void HapticControl::impedanceThread()
-{
-  if (!received_haptic_pose_)
-  {
+void HapticControl::impedanceThread() {
+  if (!received_haptic_pose_) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                           "Haptic pose not available");
     return;
@@ -426,21 +437,17 @@ void HapticControl::impedanceThread()
   target_pose_.pose.position.z =
       ee_starting_position.pose.position.z + error(2);
 
-  if (enable_safety_sphere_)
-  {
+  if (enable_safety_sphere_) {
     Eigen::Vector3d target_position_vec(target_pose_.pose.position.x,
                                         target_pose_.pose.position.y,
                                         target_pose_.pose.position.z);
     RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                         "Current distance: %f, safety sphere radius: %f", target_position_vec.norm(),
-                         safety_sphere_radius_);
-    if (target_position_vec.norm() > safety_sphere_radius_)
-    {
+                         "Current distance: %f, safety sphere radius: %f",
+                         target_position_vec.norm(), safety_sphere_radius_);
+    if (target_position_vec.norm() > safety_sphere_radius_) {
       // project the target on the safety sphere to prevent singularities
       project_target_on_sphere(target_position_vec, safety_sphere_radius_);
-    }
-    else
-    {
+    } else {
       // update the old pose only if the target is within the safety sphere
       x_tilde_old_ = x_tilde_new_;
     }
@@ -451,7 +458,8 @@ void HapticControl::impedanceThread()
                             haptic_starting_position_.pose.orientation.x,
                             haptic_starting_position_.pose.orientation.y,
                             haptic_starting_position_.pose.orientation.z);
-  Eigen::Quaterniond qCur(cur_pose_[6], cur_pose_[3], cur_pose_[4], cur_pose_[5]);
+  Eigen::Quaterniond qCur(cur_pose_[6], cur_pose_[3], cur_pose_[4],
+                          cur_pose_[5]);
   Eigen::Quaterniond qEEStart(ee_starting_position.pose.orientation.w,
                               ee_starting_position.pose.orientation.x,
                               ee_starting_position.pose.orientation.y,
@@ -464,9 +472,11 @@ void HapticControl::impedanceThread()
   // current_pose_.pose.position.z = target_pose_.pose.position.z;
 
   // // SAFE ZONE POSITION
-  // current_pose_.pose.position.x = std::clamp(current_pose_.pose.position.x, min_x_, max_x_);
-  // current_pose_.pose.position.y = std::clamp(current_pose_.pose.position.y, min_y_, max_y_);
-  // current_pose_.pose.position.z = std::clamp(current_pose_.pose.position.z, min_z_, max_z_);
+  // current_pose_.pose.position.x = std::clamp(current_pose_.pose.position.x,
+  // min_x_, max_x_); current_pose_.pose.position.y =
+  // std::clamp(current_pose_.pose.position.y, min_y_, max_y_);
+  // current_pose_.pose.position.z = std::clamp(current_pose_.pose.position.z,
+  // min_z_, max_z_);
 
   // current_pose_.pose.orientation.x = qCur.x();
   // current_pose_.pose.orientation.y = qCur.y();
@@ -490,12 +500,12 @@ void HapticControl::impedanceThread()
 
   target_pos_publisher_->publish(target_pose_);
 }
-void HapticControl::project_target_on_sphere(Eigen::Vector3d &target_position_vec, double safety_sphere_radius_)
-{
-  target_position_vec = target_position_vec.normalized() * safety_sphere_radius_;
+void HapticControl::project_target_on_sphere(
+    Eigen::Vector3d &target_position_vec, double safety_sphere_radius_) {
+  target_position_vec =
+      target_position_vec.normalized() * safety_sphere_radius_;
 }
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting Haptic Control node");
 
   rclcpp::init(argc, argv);
