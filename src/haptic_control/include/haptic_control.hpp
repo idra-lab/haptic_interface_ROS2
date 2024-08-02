@@ -4,6 +4,8 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_ros/transform_broadcaster.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -80,6 +82,7 @@ private:
   // ROS2 tf2 transform listener and buffer
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   // ROS2 params callbacks
   std::shared_ptr<rclcpp::ParameterEventHandler> param_subscriber_;
   std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_enable_safety_sphere_;
@@ -90,8 +93,9 @@ private:
   std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_safety_box_height_;
 
   geometry_msgs::msg::WrenchStamped current_wrench_;
-  geometry_msgs::msg::PoseStamped target_pose_;
-  geometry_msgs::msg::PoseStamped old_pose_, current_pose_;
+  geometry_msgs::msg::PoseStamped target_pose_, current_pose_;
+  geometry_msgs::msg::TransformStamped target_pose_tf_;
+  geometry_msgs::msg::PoseStamped old_pose_;
   geometry_msgs::msg::PoseStamped ee_starting_position;
   geometry_msgs::msg::PoseStamped ee_current_pose_;
   geometry_msgs::msg::PoseStamped haptic_starting_position_;

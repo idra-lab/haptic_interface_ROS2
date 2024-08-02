@@ -109,6 +109,7 @@ HapticControl::HapticControl(const std::string &name,
   // Initializes the TF2 transform listener and buffer
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+  tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
   // defines the rotation from the robot base frame to the haptic base frame
   Eigen::Quaterniond tmp(Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
@@ -293,7 +294,6 @@ void HapticControl::call_impedance_service() {
               ee_starting_position.pose.orientation.w);
 
   // Request impedance mode
-
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending impedance request");
 
   auto imp = std::make_shared<
@@ -351,6 +351,7 @@ void HapticControl::call_impedance_service() {
   RCLCPP_INFO(this->get_logger(), "\033[0;32mImpedance thread started\033[0m");
 }
 
+// This function is called at 1000 Hz
 void HapticControl::impedanceThread() {
   if (!received_haptic_pose_) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
@@ -411,15 +412,11 @@ void HapticControl::impedanceThread() {
 
   _in_virtuose_force->publish(force);
   ctr_++;
-  // uint64_t dt = get_clock()->now().nanoseconds() -
-  //               (long long unsigned int)status_date_sec_ * 1000000000U +
-  //               (long long unsigned int)status_date_nanosec_;
 
   // Publish target position
-  geometry_msgs::msg::PoseStamped target_pose_, current_pose_;
-  target_pose_.header.stamp.nanosec = get_clock()->now().nanoseconds();
-  target_pose_.header.stamp.sec = get_clock()->now().seconds();
-  target_pose_.header.frame_id = base_link_name_;
+  target_pose_.header.stamp = target_pose_tf_.header.stamp = get_clock()->now();
+  target_pose_.header.frame_id = target_pose_tf_.header.frame_id = base_link_name_;
+  target_pose_tf_.child_frame_id = "haptic_interface_target";
 
   // computing error
   Eigen::Vector3d error;
@@ -427,14 +424,11 @@ void HapticControl::impedanceThread() {
   error[1] = x_tilde_new_[1] - haptic_starting_position_.pose.position.y;
   error[2] = x_tilde_new_[2] - haptic_starting_position_.pose.position.z;
 
-  // applying rotation from haptic base frame to robot base frame
-  // error = q_haptic_base_to_robot_base_.toRotationMatrix() * error;
-
-  target_pose_.pose.position.x =
+  target_pose_.pose.position.x = target_pose_tf_.transform.translation.x =
       ee_starting_position.pose.position.x + error(0);
-  target_pose_.pose.position.y =
+  target_pose_.pose.position.y = target_pose_tf_.transform.translation.y =
       ee_starting_position.pose.position.y + error(1);
-  target_pose_.pose.position.z =
+  target_pose_.pose.position.z = target_pose_tf_.transform.translation.z =
       ee_starting_position.pose.position.z + error(2);
 
   if (enable_safety_sphere_) {
@@ -465,25 +459,6 @@ void HapticControl::impedanceThread() {
                               ee_starting_position.pose.orientation.y,
                               ee_starting_position.pose.orientation.z);
 
-  // transform back to quaternion
-  // current_pose_.header.frame_id = base_link_name_;
-  // current_pose_.pose.position.x = target_pose_.pose.position.x;
-  // current_pose_.pose.position.y = target_pose_.pose.position.y;
-  // current_pose_.pose.position.z = target_pose_.pose.position.z;
-
-  // // SAFE ZONE POSITION
-  // current_pose_.pose.position.x = std::clamp(current_pose_.pose.position.x,
-  // min_x_, max_x_); current_pose_.pose.position.y =
-  // std::clamp(current_pose_.pose.position.y, min_y_, max_y_);
-  // current_pose_.pose.position.z = std::clamp(current_pose_.pose.position.z,
-  // min_z_, max_z_);
-
-  // current_pose_.pose.orientation.x = qCur.x();
-  // current_pose_.pose.orientation.y = qCur.y();
-  // current_pose_.pose.orientation.z = qCur.z();
-  // current_pose_.pose.orientation.w = qCur.w();
-  // current_target_pos_publisher_->publish(current_pose_);
-
   // computing the difference between the current orientation and the starting
   // orientation of the haptic device
   Eigen::Quaterniond qDiff = qCur * qStart.conjugate();
@@ -493,11 +468,13 @@ void HapticControl::impedanceThread() {
   Eigen::Quaterniond qTarget = qDiff * qEEStart;
   qTarget.normalize();
 
-  target_pose_.pose.orientation.x = qTarget.x();
-  target_pose_.pose.orientation.y = qTarget.y();
-  target_pose_.pose.orientation.z = qTarget.z();
-  target_pose_.pose.orientation.w = qTarget.w();
+  target_pose_.pose.orientation.x = target_pose_tf_.transform.rotation.x = qTarget.x();
+  target_pose_.pose.orientation.y = target_pose_tf_.transform.rotation.y = qTarget.y();
+  target_pose_.pose.orientation.z = target_pose_tf_.transform.rotation.z = qTarget.z();
+  target_pose_.pose.orientation.w = target_pose_tf_.transform.rotation.w = qTarget.w();
 
+  // send trasnform and publish target pose
+  tf_broadcaster_->sendTransform(target_pose_tf_);
   target_pos_publisher_->publish(target_pose_);
 }
 void HapticControl::project_target_on_sphere(
