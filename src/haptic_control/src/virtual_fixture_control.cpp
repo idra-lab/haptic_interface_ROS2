@@ -9,33 +9,40 @@ using namespace std::chrono_literals;
 VirtualFixtureControl::VirtualFixtureControl(const std::string &name,
                                              const std::string &namespace_,
                                              const rclcpp::NodeOptions &options)
-    : Node(name, namespace_, options) {
+    : Node(name, namespace_, options)
+{
   // safety sphere around robot base link to prevent singularity
   this->enable_safety_sphere_ =
       this->get_parameter("enable_safety_sphere").as_bool();
-  if (this->enable_safety_sphere_) {
+  RCLCPP_INFO(this->get_logger(), "B");
+  if (this->enable_safety_sphere_)
+  {
     this->safety_sphere_radius_ =
         this->get_parameter("safety_sphere_radius").as_double();
     this->safety_sphere_radius_ =
         std::clamp(this->safety_sphere_radius_, 0.0, 2.0);
-  } else {
+  }
+  else
+  {
     this->safety_sphere_radius_ = std::numeric_limits<double>::infinity();
   }
   // safety box dimension
   this->enable_safety_box_ = this->get_parameter("enable_safety_box").as_bool();
-  if (this->enable_safety_box_) {
+  if (this->enable_safety_box_)
+  {
     this->safety_box_width_ =
-        this->get_parameter("safety_box_width").as_double();  // x
+        this->get_parameter("safety_box_width").as_double(); // x
     this->safety_box_length_ =
-        this->get_parameter("safety_box_length").as_double();  // y
+        this->get_parameter("safety_box_length").as_double(); // y
     this->safety_box_height_ =
-        this->get_parameter("safety_box_height").as_double();  // z
-  } else {
+        this->get_parameter("safety_box_height").as_double(); // z
+  }
+  else
+  {
     this->safety_box_width_ = std::numeric_limits<double>::infinity();
     this->safety_box_length_ = std::numeric_limits<double>::infinity();
     this->safety_box_height_ = std::numeric_limits<double>::infinity();
   }
-
   this->get_parameter("max_force_", max_force_);
   // safety XYZ position zone -> read from config file
   this->force_scale_ = this->get_parameter("force_scale").as_double();
@@ -69,7 +76,6 @@ VirtualFixtureControl::VirtualFixtureControl(const std::string &name,
       this->create_subscription<virtual_fixture_msgs::msg::Areas>(
           "areas", 1,
           std::bind(&VirtualFixtureControl::areasCB, this, _1));
-
   target_pos_publisher_ =
       this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                               1);
@@ -116,6 +122,11 @@ VirtualFixtureControl::VirtualFixtureControl(const std::string &name,
       std::bind(&VirtualFixtureControl::set_safety_box_height_CB, this,
                 std::placeholders::_1));
 
+  cb_next_area = param_subscriber_->add_parameter_callback(
+      "switch_to_next_area",
+      std::bind(&VirtualFixtureControl::set_next_area_cb, this,
+                std::placeholders::_1));
+
   received_haptic_pose_ = false;
 
   // Initializes the TF2 transform listener and buffer
@@ -136,69 +147,147 @@ VirtualFixtureControl::VirtualFixtureControl(const std::string &name,
   x_tilde_old_ << 0.0, 0.0, 0.0;
 
   areas_centers_.resize(14);
+  // Initialize the areas centers
+  for (auto i = 0; i < 14; i++)
+  {
+    areas_centers_[i] << 0.0, 0.0, 0.0;
+    areas_radius_[i] = 0.0;
+  }
+  RCLCPP_INFO(this->get_logger(), "VirtualFixtureControl has been initialized");
 }
 
-void VirtualFixtureControl::areasCB(const virtual_fixture_msgs::msg::Areas::SharedPtr msg) {
-  for (auto i = 0; i < 14; i++) {
+void VirtualFixtureControl::areasCB(const virtual_fixture_msgs::msg::Areas::SharedPtr msg)
+{
+  if (received_areas_)
+  {
+    return;
+  }
+  received_areas_ = true;
+  for (auto i = 0; i < 14; i++)
+  {
     areas_centers_[i] << msg->centers[i].x, msg->centers[i].y, msg->centers[i].z;
+    // RCLCPP_INFO(this->get_logger(), "SETTING Area %d center: %f %f %f", i, areas_centers_[i][0], areas_centers_[i][1], areas_centers_[i][2]);
     areas_radius_[i] = msg->areas_radius[i];
   }
 }
 
-void VirtualFixtureControl::computeVirtualFixtureError(
-    geometry_msgs::msg::WrenchStamped &vf_wrench) {
-  vf_wrench.wrench.force.x = 0.5;
+void VirtualFixtureControl::set_next_area_cb(const rclcpp::Parameter &p)
+{
+  (void)p;
+  is_in_transition_ = true;
+  next_area_++;
+  if (next_area_ > 14)
+  {
+    RCLCPP_INFO(this->get_logger(), "US scan completed, exiting");
+    rclcpp::shutdown();
+  }
+  RCLCPP_INFO(this->get_logger(), "Switching to next area %d", next_area_);
 }
-geometry_msgs::msg::WrenchStamped
-VirtualFixtureControl::addVirtualFixtureForceOverlay(
-    const geometry_msgs::msg::WrenchStamped &msg) {
-  geometry_msgs::msg::WrenchStamped target_wrench = msg;
-  geometry_msgs::msg::WrenchStamped vf_wrench;
+
+void VirtualFixtureControl::computeVirtualFixtureError(
+    raptor_api_interfaces::msg::InVirtuoseForce &vf_wrench)
+{
+  if (!received_areas_)
+  {
+    RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                          "Areas not received yet, no VF overlay will be applied");
+    return;
+  }
+  // no overlay is applied in the first motion towards the first area
+  Eigen::Vector3d current_position(target_pose_.pose.position.x, target_pose_.pose.position.y, target_pose_.pose.position.z);
+  auto distance = (current_position - areas_centers_[next_area_ - 1]).norm();
+  if (distance < areas_radius_[next_area_ - 1])
+  {
+    is_in_transition_ = false;
+    // next_area_++;
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+                         "Inside the first area: distance is %f vs ", distance, areas_radius_[next_area_ - 1]);
+  }
+  else
+  {
+
+    // RCLCPP_INFO(this->get_logger(), "Outside the first area: distance is %f vs ", distance, areas_radius_[DEBUG_IDX - 1]);
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+                         "Outside the first area: distance is %f vs ", distance, areas_radius_[next_area_ - 1]);
+  }
+  // return;
+  // }
+
+  if (is_in_transition_)
+  {
+
+    // Step 1: Define the trajectory vector
+    Eigen::Vector3d trajectory = areas_centers_[next_area_ - 1] - areas_centers_[next_area_ - 2];
+    // Step 2: Project the current position onto the trajectory line
+    Eigen::Vector3d trajectory_unit = trajectory.normalized();
+    Eigen::Vector3d projection = areas_centers_[next_area_ - 2] + trajectory_unit * ((current_position - areas_centers_[next_area_ - 2]).dot(trajectory_unit));
+
+    // Step 3: Compute the perpendicular vector from the projection to the current position
+    Eigen::Vector3d perpendicular_vector = current_position - projection;
+
+    // Step 4: Normalize the perpendicular vector
+    Eigen::Vector3d force = -perpendicular_vector.normalized();
+
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+                         "APPLYNG Force vector: %f %f %f", force[0], force[1], force[2]);
+    // Step 5: Apply the force
+    vf_wrench.virtuose_force.force.x = force[0] * 2.0;
+    vf_wrench.virtuose_force.force.y = force[1] * 2.0;
+    vf_wrench.virtuose_force.force.z = force[2] * 2.0;
+
+  }
+}
+void VirtualFixtureControl::addVirtualFixtureForceOverlay(raptor_api_interfaces::msg::InVirtuoseForce &wrench)
+{
+
+  raptor_api_interfaces::msg::InVirtuoseForce vf_wrench;
   computeVirtualFixtureError(vf_wrench);
-  target_wrench.wrench.force.x = vf_wrench.wrench.force.x;
-  return target_wrench;
+  wrench.virtuose_force.force.x = vf_wrench.virtuose_force.force.x;
 }
 
 void VirtualFixtureControl::enable_safety_sphere_CB(
-    const rclcpp::Parameter &p) {
+    const rclcpp::Parameter &p)
+{
   RCLCPP_INFO(this->get_logger(), "Toggled Safety sphere");
   enable_safety_sphere_ = (bool)p.as_int();
 }
 void VirtualFixtureControl::set_safety_sphere_radius_CB(
-    const rclcpp::Parameter &p) {
+    const rclcpp::Parameter &p)
+{
   RCLCPP_INFO(this->get_logger(),
               "Received an update to the safety sphere radius");
   safety_sphere_radius_ = std::clamp(p.as_double(), 0.0, 2.0);
 }
-void VirtualFixtureControl::enable_safety_box_CB(const rclcpp::Parameter &p) {
+void VirtualFixtureControl::enable_safety_box_CB(const rclcpp::Parameter &p)
+{
   RCLCPP_INFO(this->get_logger(), "Toggled Safety box");
   enable_safety_box_ = (bool)p.as_int();
 }
 void VirtualFixtureControl::set_safety_box_width_CB(
-    const rclcpp::Parameter &p) {
+    const rclcpp::Parameter &p)
+{
   RCLCPP_INFO(this->get_logger(), "Received an update to the safety box width");
   safety_box_width_ = std::clamp(p.as_double(), 0.0, 2.0);
 }
 void VirtualFixtureControl::set_safety_box_length_CB(
-    const rclcpp::Parameter &p) {
+    const rclcpp::Parameter &p)
+{
   RCLCPP_INFO(this->get_logger(),
               "Received an update to the safety box length");
   safety_box_length_ = std::clamp(p.as_double(), 0.0, 2.0);
 }
 void VirtualFixtureControl::set_safety_box_height_CB(
-    const rclcpp::Parameter &p) {
+    const rclcpp::Parameter &p)
+{
   RCLCPP_INFO(this->get_logger(),
               "Received an update to the safety box height");
   safety_box_height_ = std::clamp(p.as_double(), 0.0, 2.0);
 }
 
 void VirtualFixtureControl::SetWrenchCB(
-    const geometry_msgs::msg::WrenchStamped msg) {
-  // compute VF force
-  geometry_msgs::msg::WrenchStamped target_wrench =
-      addVirtualFixtureForceOverlay(msg);
+    const geometry_msgs::msg::WrenchStamped target_wrench)
+{
 
-  current_wrench_.header.stamp = target_wrench.header.stamp;
   geometry_msgs::msg::WrenchStamped force;
   force.header.stamp = target_wrench.header.stamp;
   force.wrench.force.x = target_wrench.wrench.force.x;
@@ -210,7 +299,8 @@ void VirtualFixtureControl::SetWrenchCB(
 
   // Map forces from probe frame to haptic base frame (since haptic base frame
   // coincides with robot base frame)
-  try {
+  try
+  {
     auto trans = tf_buffer_->lookupTransform(base_link_name_, ft_link_name_,
                                              tf2::TimePointZero);
     // apply rotation to the force
@@ -222,7 +312,9 @@ void VirtualFixtureControl::SetWrenchCB(
     current_wrench_.wrench.torque.x = force.wrench.torque.x;
     current_wrench_.wrench.torque.y = force.wrench.torque.y;
     current_wrench_.wrench.torque.z = force.wrench.torque.z;
-  } catch (tf2::TransformException &ex) {
+  }
+  catch (tf2::TransformException &ex)
+  {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 200,
                           "F/T sensor pose transform not available: %s",
                           ex.what());
@@ -235,8 +327,10 @@ void VirtualFixtureControl::SetWrenchCB(
 }
 // Callback for topic out_virtuose_pose_
 void VirtualFixtureControl::out_virtuose_pose_CB(
-    const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg) {
-  if (!received_haptic_pose_) {
+    const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg)
+{
+  if (!received_haptic_pose_)
+  {
     // Store last pose date
     received_haptic_pose_ = true;
     haptic_starting_position_.pose.position.x =
@@ -272,9 +366,12 @@ void VirtualFixtureControl::out_virtuose_pose_CB(
   x_new_ << cur_pose_[0], cur_pose_[1], cur_pose_[2];
 
   // ENFORCE SPHERE SAFETY
-  if (enable_safety_sphere_) {
+  if (enable_safety_sphere_)
+  {
     x_tilde_new_ = x_tilde_old_ + (x_new_ - x_old_);
-  } else {
+  }
+  else
+  {
     x_tilde_new_ = x_new_;
   }
 
@@ -287,7 +384,8 @@ void VirtualFixtureControl::out_virtuose_pose_CB(
 
 // Callback for topic out_virtuose_status
 void VirtualFixtureControl::out_virtuose_statusCB(
-    const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg) {
+    const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg)
+{
   // Store last status date
   status_date_nanosec_ = msg->header.stamp.nanosec;
   status_date_sec_ = msg->header.stamp.sec;
@@ -295,10 +393,13 @@ void VirtualFixtureControl::out_virtuose_statusCB(
   status_button_ = msg->buttons;
 }
 
-void VirtualFixtureControl::call_impedance_service() {
+void VirtualFixtureControl::call_impedance_service()
+{
   received_ee_pose_ = false;
-  while (!received_ee_pose_) {
-    try {
+  while (!received_ee_pose_)
+  {
+    try
+    {
       auto trans = tf_buffer_->lookupTransform(base_link_name_, tool_link_name_,
                                                tf2::TimePointZero);
       ee_starting_position.pose.position.x = trans.transform.translation.x;
@@ -309,16 +410,20 @@ void VirtualFixtureControl::call_impedance_service() {
       ee_starting_position.pose.orientation.z = trans.transform.rotation.z;
       ee_starting_position.pose.orientation.w = trans.transform.rotation.w;
       received_ee_pose_ = true;
-    } catch (tf2::TransformException &ex) {
+    }
+    catch (tf2::TransformException &ex)
+    {
       RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                             "End Effector pose not available: %s", ex.what());
     }
   }
-  if (enable_safety_sphere_) {
+  if (enable_safety_sphere_)
+  {
     Eigen::Vector3d ee_start(ee_starting_position.pose.position.x,
                              ee_starting_position.pose.position.y,
                              ee_starting_position.pose.position.z);
-    if (ee_start.norm() > safety_sphere_radius_) {
+    if (ee_start.norm() > safety_sphere_radius_)
+    {
       RCLCPP_ERROR(this->get_logger(),
                    "ERROR: End effector is outside the safety sphere, please "
                    "move it inside the safety sphere");
@@ -356,8 +461,10 @@ void VirtualFixtureControl::call_impedance_service() {
   imp->base_frame.rotation.z = q_haptic_base_to_robot_base_.z();
   imp->base_frame.rotation.w = q_haptic_base_to_robot_base_.w();
 
-  while (!client_->wait_for_service(1s)) {
-    if (!rclcpp::ok()) {
+  while (!client_->wait_for_service(1s))
+  {
+    if (!rclcpp::ok())
+    {
       RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                    "Interrupted while waiting for the service. Exiting.");
       return;
@@ -370,18 +477,22 @@ void VirtualFixtureControl::call_impedance_service() {
   // Wait for the result.
   if (rclcpp::spin_until_future_complete(this->get_node_base_interface(),
                                          result) ==
-      rclcpp::FutureReturnCode::SUCCESS) {
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
     // Store client_ ID given by virtuose_node
     client__id_ = result.get()->client_id;
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client_ ID is: %d",
                 client__id_);
-  } else {
+  }
+  else
+  {
     RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                  "Failed to call service impedance");
     return;
   }
 
-  if (client__id_ == 0) {
+  if (client__id_ == 0)
+  {
     RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                  "Failed to call service impedance, client__id_ is zero!");
     return;
@@ -396,47 +507,49 @@ void VirtualFixtureControl::call_impedance_service() {
 }
 
 // This function is called at 1000 Hz
-void VirtualFixtureControl::impedanceThread() {
-  if (!received_haptic_pose_) {
+void VirtualFixtureControl::impedanceThread()
+{
+  if (!received_haptic_pose_)
+  {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                           "Haptic pose not available");
     return;
   }
   // Apply the force
-  raptor_api_interfaces::msg::InVirtuoseForce force;
-  force.header.stamp.nanosec = get_clock()->now().nanoseconds();
-  force.header.stamp.sec = get_clock()->now().seconds();
-  force.client_id = client__id_;
+  raptor_api_interfaces::msg::InVirtuoseForce wrench;
+  wrench.header.stamp.nanosec = get_clock()->now().nanoseconds();
+  wrench.header.stamp.sec = get_clock()->now().seconds();
+  wrench.client_id = client__id_;
   // filter noise
   float alpha = 0;
-  force.virtuose_force.force.x =
-      0.3 * (alpha * old_force_.virtuose_force.force.x +
+  wrench.virtuose_force.force.x =
+      0.3 * (alpha * old_wrench_.virtuose_force.force.x +
              (1 - alpha) * current_wrench_.wrench.force.x);
-  force.virtuose_force.force.y =
-      0.3 * (alpha * old_force_.virtuose_force.force.y +
+  wrench.virtuose_force.force.y =
+      0.3 * (alpha * old_wrench_.virtuose_force.force.y +
              (1 - alpha) * current_wrench_.wrench.force.y);
-  force.virtuose_force.force.z =
-      0.3 * (alpha * old_force_.virtuose_force.force.z +
+  wrench.virtuose_force.force.z =
+      0.3 * (alpha * old_wrench_.virtuose_force.force.z +
              (1 - alpha) * current_wrench_.wrench.force.z);
   // torque omitted for control simplicity
-  force.virtuose_force.torque.x =
-      0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.x + (1 - alpha)
-            // * current_wrench_.wrench.torque.x);
-  force.virtuose_force.torque.y =
-      0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.y + (1 - alpha)
-            // * current_wrench_.wrench.torque.y);
-  force.virtuose_force.torque.z =
-      0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.z + (1 - alpha)
-            // * current_wrench_.wrench.torque.z);
+  wrench.virtuose_force.torque.x =
+      0.0; // 0.2 * (alpha * old_wrench_.virtuose_force.torque.x + (1 - alpha)
+           // * current_wrench_.wrench.torque.x);
+  wrench.virtuose_force.torque.y =
+      0.0; // 0.2 * (alpha * old_wrench_.virtuose_force.torque.y + (1 - alpha)
+           // * current_wrench_.wrench.torque.y);
+  wrench.virtuose_force.torque.z =
+      0.0; // 0.2 * (alpha * old_wrench_.virtuose_force.torque.z + (1 - alpha)
+           // * current_wrench_.wrench.torque.z);
 
   // SAFE ZONE FORCE
 
-  force.virtuose_force.force.x =
-      std::clamp(force.virtuose_force.force.x, -6.0, 6.0);
-  force.virtuose_force.force.y =
-      std::clamp(force.virtuose_force.force.y, -6.0, 6.0);
-  force.virtuose_force.force.z =
-      std::clamp(force.virtuose_force.force.z, -6.0, 6.0);
+  wrench.virtuose_force.force.x =
+      std::clamp(wrench.virtuose_force.force.x, -6.0, 6.0);
+  wrench.virtuose_force.force.y =
+      std::clamp(wrench.virtuose_force.force.y, -6.0, 6.0);
+  wrench.virtuose_force.force.z =
+      std::clamp(wrench.virtuose_force.force.z, -6.0, 6.0);
 
   // // SAFE ZONE TORQUE
   // force.virtuose_force.torque.x =
@@ -447,14 +560,16 @@ void VirtualFixtureControl::impedanceThread() {
   // std::clamp(force.virtuose_force.torque.z,-0.2,0.2);
 
   // updating old force
-  old_force_.virtuose_force.force.x = force.virtuose_force.force.x;
-  old_force_.virtuose_force.force.y = force.virtuose_force.force.y;
-  old_force_.virtuose_force.force.z = force.virtuose_force.force.z;
-  old_force_.virtuose_force.torque.x = force.virtuose_force.torque.x;
-  old_force_.virtuose_force.torque.y = force.virtuose_force.torque.y;
-  old_force_.virtuose_force.torque.z = force.virtuose_force.torque.z;
+  old_wrench_.virtuose_force.force.x = wrench.virtuose_force.force.x;
+  old_wrench_.virtuose_force.force.y = wrench.virtuose_force.force.y;
+  old_wrench_.virtuose_force.force.z = wrench.virtuose_force.force.z;
+  old_wrench_.virtuose_force.torque.x = wrench.virtuose_force.torque.x;
+  old_wrench_.virtuose_force.torque.y = wrench.virtuose_force.torque.y;
+  old_wrench_.virtuose_force.torque.z = wrench.virtuose_force.torque.z;
 
-  _in_virtuose_force->publish(force);
+  // compute VF force
+  addVirtualFixtureForceOverlay(wrench);
+  _in_virtuose_force->publish(wrench);
   ctr_++;
 
   // Publish target position
@@ -476,17 +591,21 @@ void VirtualFixtureControl::impedanceThread() {
   target_pose_.pose.position.z = target_pose_tf_.transform.translation.z =
       ee_starting_position.pose.position.z + error(2);
 
-  if (enable_safety_sphere_) {
+  if (enable_safety_sphere_)
+  {
     Eigen::Vector3d target_position_vec(target_pose_.pose.position.x,
                                         target_pose_.pose.position.y,
                                         target_pose_.pose.position.z);
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                         "Current distance: %f, safety sphere radius: %f",
-                         target_position_vec.norm(), safety_sphere_radius_);
-    if (target_position_vec.norm() > safety_sphere_radius_) {
+    // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+    //                      "Current distance: %f, safety sphere radius: %f",
+    //                      target_position_vec.norm(), safety_sphere_radius_);
+    if (target_position_vec.norm() > safety_sphere_radius_)
+    {
       // project the target on the safety sphere to prevent singularities
       project_target_on_sphere(target_position_vec, safety_sphere_radius_);
-    } else {
+    }
+    else
+    {
       // update the old pose only if the target is within the safety sphere
       x_tilde_old_ = x_tilde_new_;
     }
@@ -527,7 +646,8 @@ void VirtualFixtureControl::impedanceThread() {
   target_pos_publisher_->publish(target_pose_);
 }
 void VirtualFixtureControl::project_target_on_sphere(
-    Eigen::Vector3d &target_position_vec, double safety_sphere_radius_) {
+    Eigen::Vector3d &target_position_vec, double safety_sphere_radius_)
+{
   target_position_vec =
       target_position_vec.normalized() * safety_sphere_radius_;
 }

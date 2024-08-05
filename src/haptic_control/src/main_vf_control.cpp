@@ -1,7 +1,7 @@
 # include "virtual_fixture_control.hpp"
 
 int main(int argc, char **argv) {
-  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting Haptic Control node");
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting VF Haptic Control node"); 
 
   rclcpp::init(argc, argv);
   auto node = std::make_shared<VirtualFixtureControl>();

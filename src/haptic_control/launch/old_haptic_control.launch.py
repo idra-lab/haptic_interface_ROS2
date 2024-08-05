@@ -66,25 +66,24 @@ def generate_launch_description():
     print("\n\n\n\033[93m WARNING: ROBOT MUST NOT BE IN CONTACT WITH ANYTHING DURING CALIBRATION\033[00m\n\n")
     # time.sleep(3)
     print("\n\n\033[92mRESETTING FORCE SENSOR...\033[00m\n")
-    # rclpy.init()
-    # reset_wrench_node = FTReset()
-    # response = reset_wrench_node.send_request()
-    # reset_wrench_node.get_logger().info('\n\n'+str(response))
-    # print("Calibration result: "+str(response))
-    # while 'success=True' not in str(response):
-    #     print("\nERROR: Force sensor not reset, trying again...\n")
-    #     response = reset_wrench_node.send_request()
-    #     reset_wrench_node.get_logger().info('\n\n'+str(response))
-    # reset_wrench_node.destroy_node()
-    # rclpy.shutdown()
+    rclpy.init()
+    reset_wrench_node = FTReset()
+    response = reset_wrench_node.send_request()
+    reset_wrench_node.get_logger().info('\n\n'+str(response))
+    print("Calibration result: "+str(response))
+    while 'success=True' not in str(response):
+        print("\nERROR: Force sensor not reset, trying again...\n")
+        response = reset_wrench_node.send_request()
+        reset_wrench_node.get_logger().info('\n\n'+str(response))
+    reset_wrench_node.destroy_node()
+    rclpy.shutdown()
 
     print("\n\n\033[91mREMEMBER TO ACTIVATE FORCE FEEDBACK BUTTON ON HAPTIC DEVICE\033[00m\n\n")
 
     ############################## HAPTIC DEVICE CONTROL NODE ##################
     # haptic_wrapper
     haptic_wrapper = TimerAction(
-        # period = 2.0,
-        period = 0.0,
+        period = 2.0,
         actions = [Node(
         package="haption_raptor_api",
         executable="raptor_api_wrapper"
@@ -97,7 +96,7 @@ def generate_launch_description():
 
     # CALIBRATION NODE
     haptic_calibration_node = TimerAction(
-        period = 1.0,
+        period = 2.0,
         actions = [Node(
         package="test_calibration",
         executable="test_calibration",
@@ -109,11 +108,11 @@ def generate_launch_description():
     haptic_parameters_control = get_package_share_directory('haptic_control') + "/config/parameters.yaml"
 
     haptic_control_node = TimerAction(
-        period=2.0,
+        period=4.0,
         actions=[
             Node(
                 package="haptic_control",
-                executable="virtual_fixture_control",
+                executable="haptic_control",
                 # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
                     ParameterFile(haptic_parameters_control)
