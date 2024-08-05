@@ -24,18 +24,23 @@ find_package(raptor_api_interfaces REQUIRED)
 find_package(haption_raptor_api REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
-
+find_package(virtual_fixture_msgs REQUIRED)
 # find eigen
 find_package(Eigen3 REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(${This} src/haptic_control.cpp)
-ament_target_dependencies(${This} rclcpp raptor_api_interfaces haption_raptor_api tf2_ros tf2_geometry_msgs)
-target_include_directories(${This} PUBLIC include)
+add_executable(${This} src/main_haptic_control.cpp src/haptic_control.cpp)
+add_executable(virtual_fixture_control src/main_vf_control.cpp src/virtual_fixture_control.cpp)
 
-target_include_directories(${This} PUBLIC
+ament_target_dependencies(${This} rclcpp raptor_api_interfaces haption_raptor_api tf2_ros tf2_geometry_msgs)
+ament_target_dependencies(virtual_fixture_control rclcpp raptor_api_interfaces haption_raptor_api tf2_ros tf2_geometry_msgs virtual_fixture_msgs)
+include_directories(${This} PUBLIC include)
+include_directories(virtual_fixture_control PUBLIC include)
+
+include_directories(${This} PUBLIC
+include_directories(virtual_fixture_control PUBLIC)
 
 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include>
@@ -58,7 +63,7 @@ else()
 endif()
 
 
-install(TARGETS ${This}
+install(TARGETS ${This} virtual_fixture_control
   DESTINATION lib/${PROJECT_NAME})
 
 install(

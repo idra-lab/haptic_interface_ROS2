@@ -1,11 +1,8 @@
-#ifndef HAPTIC_CONTROL_HPP
-#define HAPTIC_CONTROL_HPP
+#ifndef VIRTUAL_FIXTURE_CONTROL_HPP
+#define VIRTUAL_FIXTURE_CONTROL_HPP
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
-#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "tf2/LinearMath/Quaternion.h"
-#include "tf2_ros/transform_broadcaster.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -27,20 +24,26 @@
 #include "raptor_api_interfaces/msg/out_virtuose_status.hpp"
 #include "raptor_api_interfaces/srv/virtuose_impedance.hpp"
 #include "raptor_api_interfaces/srv/virtuose_reset.hpp"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_ros/transform_broadcaster.h"
+#include "virtual_fixture_msgs/msg/areas.hpp"
 
 using namespace Eigen;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using namespace std::chrono_literals;
 
-class HapticControl : public rclcpp::Node {
-public:
-  HapticControl(const std::string &name = "haptic_control",
-                const std::string &namespace_ = "",
-                const rclcpp::NodeOptions &options =
-                    rclcpp::NodeOptions()
-                        .allow_undeclared_parameters(true)
-                        .automatically_declare_parameters_from_overrides(true));
+class VirtualFixtureControl : public rclcpp::Node {
+ public:
+  VirtualFixtureControl(
+      const std::string &name = "virtual_fixture_control",
+      const std::string &namespace_ = "",
+      const rclcpp::NodeOptions &options =
+          rclcpp::NodeOptions()
+              .allow_undeclared_parameters(true)
+              .automatically_declare_parameters_from_overrides(true));
+  void areasCB(const virtual_fixture_msgs::msg::Areas::SharedPtr msg);
   void enable_safety_sphere_CB(const rclcpp::Parameter &p);
   void set_safety_sphere_radius_CB(const rclcpp::Parameter &p);
   void enable_safety_box_CB(const rclcpp::Parameter &p);
@@ -57,8 +60,18 @@ public:
   void impedanceThread();
   void project_target_on_sphere(Eigen::Vector3d &target_position_vec,
                                 double safety_sphere_radius_);
+  geometry_msgs::msg::WrenchStamped addVirtualFixtureForceOverlay(
+      const geometry_msgs::msg::WrenchStamped &target_wrench);
+  void computeVirtualFixtureError(geometry_msgs::msg::WrenchStamped &vf_wrench);
 
-protected:
+ protected:
+  // US AREAS
+  rclcpp::Subscription<virtual_fixture_msgs::msg::Areas>::SharedPtr
+      areas_subscriber_;
+  std::vector<Eigen::Vector3d> areas_centers_;
+  float areas_radius_[14];
+
+
   // ROS2 subscribtions
   rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuoseStatus>::SharedPtr
       out_virtuose_status_;
@@ -131,4 +144,4 @@ protected:
   Eigen::Vector3d x_tilde_old_, x_tilde_new_;
 };
 
-#endif // HAPTIC_CONTROL_HPP
+#endif  // VIRTUAL_FIXTURE_CONTROL_HPP
