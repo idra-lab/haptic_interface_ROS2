@@ -35,7 +35,7 @@ public:
               .allow_undeclared_parameters(true)
               .automatically_declare_parameters_from_overrides(true));
     void PoseCB(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
-    void UpdateRviz(geometry_msgs::msg::PoseStamped pose, double radius);
+    void UpdateRviz(geometry_msgs::msg::PoseStamped pose, double radius, std::vector<double> color, uint id);
     void ClearRviz();
     void UpdateRibCageRviz();
 

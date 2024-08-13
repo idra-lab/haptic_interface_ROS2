@@ -33,7 +33,7 @@ def generate_launch_description():
     )
 
     
-    ld.add_action(rviz)
+    # ld.add_action(rviz)
     ld.add_action(vf_node)
     return ld
 
