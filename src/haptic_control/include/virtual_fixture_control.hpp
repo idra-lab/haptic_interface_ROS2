@@ -28,6 +28,8 @@
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 #include "virtual_fixture_msgs/msg/areas.hpp"
+#include "virtual_fixture.hpp"
+
 
 using namespace Eigen;
 using std::placeholders::_1;
@@ -108,6 +110,10 @@ protected:
     std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_safety_box_length_;
     std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_safety_box_height_;
     std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_next_area;
+
+
+    open3d::geometry::TriangleMesh rib_cage_;
+    VirtualFixtureCalculator virtual_fixture_calculator_;
 
     geometry_msgs::msg::WrenchStamped current_wrench_;
     geometry_msgs::msg::PoseStamped target_pose_, current_pose_;

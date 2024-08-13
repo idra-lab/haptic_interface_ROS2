@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>haptic_control</name>
+  <name>virtual_fixture_test</name>
   <version>0.0.0</version>
   <description>The position_control package</description>
 
