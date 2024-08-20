@@ -67,7 +67,7 @@ HapticControl::HapticControl(const std::string &name,
       this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                               1);
   current_target_pos_publisher_ =
-      this->create_publisher<geometry_msgs::msg::PoseStamped>("current_frame",
+      this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame_vf",
                                                               1);
 
   _in_virtuose_force =
