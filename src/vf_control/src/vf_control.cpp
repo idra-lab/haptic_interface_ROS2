@@ -20,8 +20,6 @@ VFControl::VFControl(
     target_pos_publisher_ =
         this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                                 1);
-    vf_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-        "/target_frame_vf", 1, std::bind(&VFControl::virtual_fixture_cb, this, _1));
 
     client_ = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
         "virtuose_impedance");
@@ -44,8 +42,8 @@ VFControl::VFControl(
         rclcpp::shutdown();
     }
 
-    RCLCPP_INFO_STREAM(this->get_logger(), "Loaded mesh with " << o3d_mesh->vertices_.size() << " vertices and " << o3d_mesh->triangles_.size() << " triangles.");
-
+    RCLCPP_INFO_STREAM(this->get_logger(), "Loaded mesh with " << o3d_mesh->vertices_.size()
+                                                               << " vertices and " << o3d_mesh->triangles_.size() << " triangles.");
     // Ensure the mesh has vertices
     if (o3d_mesh->vertices_.empty())
     {
@@ -63,7 +61,6 @@ VFControl::VFControl(
 
     RCLCPP_INFO_STREAM(this->get_logger(), "Created KDTree");
 
-
     // Example: Query the nearest neighbor of the first vertex
     std::vector<int> indices;
     std::vector<double> distances;
@@ -80,26 +77,22 @@ VFControl::VFControl(
         std::cerr << "No nearest neighbors found." << std::endl;
     }
     // convert to eigen
-    
+
     RCLCPP_INFO_STREAM(this->get_logger(), "Computing mesh properties...");
 
-    Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->vertex_normals_);
-
-
+    mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->vertex_normals_);
 }
 void VFControl::out_virtuose_pose_CB(
     const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg)
 {
     x_new_ << msg->virtuose_pose.translation.x, msg->virtuose_pose.translation.y,
         msg->virtuose_pose.translation.z;
-}
-void VFControl::virtual_fixture_cb(
-    const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-{
 
-    vf_pose_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Received VF : %f %f %f", vf_pose_(0), vf_pose_(1), vf_pose_(2));
+    Eigen::Vector3d delta_x = enforce_virtual_fixture(*mesh_, x_new_, vf_pose_, 0.03);
+    vf_pose_ += 0.9*delta_x;
+    std::cout << "VF pose: " << vf_pose_ << std::endl;
 }
+
 void VFControl::call_impedance_service()
 {
 

@@ -11,6 +11,9 @@
 #include <omp.h>
 #include <cmath>
 #include "location.hpp"
+// nlohmann json
+#include "json.hpp"
+
 struct hash_tuple
 {
     template <class T1, class T2>
@@ -34,20 +37,36 @@ public:
         // Convert vertices to a PointCloud
         point_cloud_ = std::make_shared<open3d::geometry::PointCloud>();
         point_cloud_->points_ = vertices;
-        
+
         kdtree.SetGeometry(*point_cloud_);
         std::cout << "Precomputing transformation matrices" << std::endl;
         precompute_triangle_xfm();
         std::cout << "Precomputing adjacency dictionary" << std::endl;
         precompute_adjacency();
     }
-
     std::vector<int> find_nearby_triangles(const Eigen::Vector3d &position, double max_distance)
     {
         std::vector<int> indices;
         std::vector<double> distances;
         kdtree.SearchRadius(position, max_distance, indices, distances);
-        return indices;
+
+        std::unordered_set<int> index_set(indices.begin(), indices.end());
+        std::vector<int> nearby_triangles;
+
+        for (size_t i = 0; i < faces.size(); ++i)
+        {
+            auto face = faces[i];
+            for (auto vertex_index : face)
+            {
+                if (index_set.find(vertex_index) != index_set.end())
+                {
+                    nearby_triangles.push_back(i);
+                    break; // No need to check other vertices of this face
+                }
+            }
+        }
+
+        return nearby_triangles;
     }
     std::pair<Eigen::Vector3d, Location> get_closest_on_triangle(const Eigen::Vector3d &point, int face)
     {
@@ -92,7 +111,7 @@ public:
 
     void precompute_adjacency()
     {
-        if (load_adjacency_dict("adjacency_dict.pkl"))
+        if (load_adjacency_dict("adjacency_dict.txt"))
         {
             return;
         }
@@ -114,7 +133,7 @@ public:
             }
         }
 
-        save_adjacency_dict("adjacency_dict.pkl", adjacency_dict);
+        save_adjacency_dict("adjacency_dict.txt", adjacency_dict);
         this->adjacency_dict = adjacency_dict;
     }
 
@@ -229,6 +248,7 @@ public:
     std::vector<Eigen::Vector3i> faces;
     std::vector<Eigen::Vector3d> normals;
     std::unordered_map<std::tuple<int, Location>, std::vector<int>, hash_tuple> adjacency_dict;
+
 private:
     std::vector<Eigen::Matrix4d> triangle_xfm;
     std::vector<Eigen::Matrix4d> triangle_xfm_inv;
@@ -242,23 +262,23 @@ private:
         {
             return false;
         }
-        // Implement the deserialization logic
-        // ...
-        ifs.close();
+        nlohmann::json j;
+        ifs >> j;
+        adjacency_dict = j.get<std::unordered_map<std::tuple<int, Location>, std::vector<int>, hash_tuple>>();
         return true;
     }
 
     void save_adjacency_dict(const std::string &filename,
                              const std::unordered_map<std::tuple<int, Location>, std::vector<int>, hash_tuple> &dict)
     {
+        // serialize with json nlohmann
         std::ofstream ofs(filename, std::ios::binary);
         if (!ofs.is_open())
         {
             return;
         }
-        // Implement the serialization logic
-        // ...
-        ofs.close();
+        nlohmann::json j = dict;
+        ofs << j.dump(4);
     }
 };
 

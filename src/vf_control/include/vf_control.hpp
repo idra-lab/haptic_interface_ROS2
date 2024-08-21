@@ -55,6 +55,7 @@
 #include "mesh.hpp"
 #include "vf_computation.hpp"
 
+
 class VFControl : public rclcpp::Node
 {
 public:
@@ -65,8 +66,6 @@ public:
             rclcpp::NodeOptions()
                 .allow_undeclared_parameters(true)
                 .automatically_declare_parameters_from_overrides(true));
-    void virtual_fixture_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
-
     // void UpdateRviz(geometry_msgs::msg::PoseStamped pose, double radius, std::vector<double> color, uint id);
     // void ClearRviz();
     // void UpdateRibCageRviz();
@@ -102,8 +101,10 @@ private:
     rclcpp::TimerBase::SharedPtr impedanceThread_;
     rclcpp::TimerBase::SharedPtr visualizationThread_;
 
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr vf_sub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
+
+    // MESH
+    std::shared_ptr<Mesh> mesh_;
 
     Eigen::Vector3d x_new_, vf_pose_;
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -116,6 +117,7 @@ private:
 
     int client__id_;
     int ctr_;
+    const double radius_ = 0.01;
 };
 
 #endif // VF_CONTROL_HPP
