@@ -21,12 +21,12 @@ VFControl::VFControl(
         this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                                 1);
     vf_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-        "virtual_fixture", 1, std::bind(&VFControl::virtual_fixture_cb, this, _1));
+        "/target_frame_vf", 1, std::bind(&VFControl::virtual_fixture_cb, this, _1));
 
     client_ = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
         "virtuose_impedance");
-    
-    marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
+
+    marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
         "visualization_marker", 1);
 
     x_new_ << 0.0, 0.0, 0.0;
@@ -35,6 +35,57 @@ VFControl::VFControl(
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+
+    auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
+
+    if (!open3d::io::ReadTriangleMesh(load_path_, *o3d_mesh))
+    {
+        std::cerr << "Failed to load mesh from file: " << load_path_ << std::endl;
+        rclcpp::shutdown();
+    }
+
+    RCLCPP_INFO_STREAM(this->get_logger(), "Loaded mesh with " << o3d_mesh->vertices_.size() << " vertices and " << o3d_mesh->triangles_.size() << " triangles.");
+
+    // Ensure the mesh has vertices
+    if (o3d_mesh->vertices_.empty())
+    {
+        std::cerr << "The loaded mesh contains no vertices." << std::endl;
+        rclcpp::shutdown();
+    }
+
+    // Convert vertices to a PointCloud
+    auto point_cloud = std::make_shared<open3d::geometry::PointCloud>();
+    point_cloud->points_ = o3d_mesh->vertices_;
+
+    // Build a KDTree for the point cloud
+    open3d::geometry::KDTreeFlann kdtree;
+    kdtree.SetGeometry(*point_cloud);
+
+    RCLCPP_INFO_STREAM(this->get_logger(), "Created KDTree");
+
+
+    // Example: Query the nearest neighbor of the first vertex
+    std::vector<int> indices;
+    std::vector<double> distances;
+    open3d::geometry::KDTreeSearchParamKNN search_param_knn(1); // 1 nearest neighbor
+
+    kdtree.SearchKNN(point_cloud->points_[0], 1, indices, distances);
+
+    if (!indices.empty())
+    {
+        std::cout << "Nearest neighbor index: " << indices[0] << ", distance: " << distances[0] << std::endl;
+    }
+    else
+    {
+        std::cerr << "No nearest neighbors found." << std::endl;
+    }
+    // convert to eigen
+    
+    RCLCPP_INFO_STREAM(this->get_logger(), "Computing mesh properties...");
+
+    Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->vertex_normals_);
+
+
 }
 void VFControl::out_virtuose_pose_CB(
     const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg)
@@ -45,7 +96,9 @@ void VFControl::out_virtuose_pose_CB(
 void VFControl::virtual_fixture_cb(
     const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
+
     vf_pose_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Received VF : %f %f %f", vf_pose_(0), vf_pose_(1), vf_pose_(2));
 }
 void VFControl::call_impedance_service()
 {
@@ -113,19 +166,20 @@ void VFControl::call_impedance_service()
     // Perform impedance loop at 1000 Hz
     // impedanceThread_ = this->create_wall_timer(
     //     1ms, std::bind(&VFControl::impedanceThread, this));
+    rclcpp::sleep_for(1s); // idk why it is needed
+    AddMesh();
     visualizationThread_ = this->create_wall_timer(
         30ms, std::bind(&VFControl::UpdateScene, this));
     RCLCPP_INFO(this->get_logger(), "\033[0;32mVisualization thread started\033[0m");
-    AddMesh();
 }
 void VFControl::out_virtuose_statusCB(
     const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg)
 {
     // Store last status date
-    auto status_date_nanosec_ = msg->header.stamp.nanosec;
-    auto status_date_sec_ = msg->header.stamp.sec;
-    auto status_state_ = msg->state;
-    auto status_button_ = msg->buttons;
+    // auto status_date_nanosec_ = msg->header.stamp.nanosec;
+    // auto status_date_sec_ = msg->header.stamp.sec;
+    // auto status_state_ = msg->state;
+    // auto status_button_ = msg->buttons;
 }
 void VFControl::impedanceThread()
 {
@@ -152,12 +206,17 @@ void VFControl::impedanceThread()
 }
 void VFControl::AddMesh()
 {
+    visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
     marker.header.frame_id = base_link_name_;
     marker.header.stamp = this->now();
     marker.id = 0;
     marker.type = visualization_msgs::msg::Marker::MESH_RESOURCE;
     marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.ns = "rib_cage";
+    marker.pose.position.x = 0.0;
+    marker.pose.position.y = 0.0;
+    marker.pose.position.z = 0.0;
     marker.mesh_resource = "file://" + load_path_;
     marker.mesh_use_embedded_materials = true;
     marker.scale.x = 1.0;
@@ -169,29 +228,26 @@ void VFControl::AddMesh()
     marker.color.b = 1.0;
     marker.color.a = 1.0;
     RCLCPP_INFO(this->get_logger(), "Rib cage mesh loaded");
-    marker_pub_->publish(marker);
+    marker_array.markers.push_back(marker);
+    marker_pub_->publish(marker_array);
 }
 void VFControl::UpdateScene()
 {
-    geometry_msgs::msg::PoseStamped vf_pose, target_pose;
-    vf_pose.header.frame_id = target_pose.header.frame_id = base_link_name_;
-    vf_pose.header.stamp = target_pose.header.stamp = get_clock()->now();
-    vf_pose.pose.position.x = vf_pose_(0);
-    vf_pose.pose.position.y = vf_pose_(1);
-    vf_pose.pose.position.z = vf_pose_(2);
+    geometry_msgs::msg::PoseStamped target_pose;
+    target_pose.header.frame_id = base_link_name_;
+    target_pose.header.stamp = get_clock()->now();
     target_pose.pose.position.x = x_new_(0);
     target_pose.pose.position.y = x_new_(1);
     target_pose.pose.position.z = x_new_(2);
-
-    // Publish virtual fixture and target pose
-    // vf_sub_->publish(vf_pose);
     target_pos_publisher_->publish(target_pose);
 
+    visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
     marker.header.frame_id = base_link_name_;
     marker.header.stamp = get_clock()->now();
     // marker.ns = "virtual_fixture";
     marker.id = 1;
+    marker.ns = "virtual_fixture";
     marker.type = visualization_msgs::msg::Marker::SPHERE;
     marker.action = visualization_msgs::msg::Marker::ADD;
     marker.pose.position.x = vf_pose_(0);
@@ -204,16 +260,17 @@ void VFControl::UpdateScene()
     marker.color.r = 0.0;
     marker.color.g = 1.0;
     marker.color.b = 0.0;
-    marker_pub_->publish(marker);
+    marker_array.markers.push_back(marker);
     // marker.ns = "target_pose";
+    marker.ns = "target_pose";
     marker.id = 2;
     marker.pose.position.x = x_new_(0);
     marker.pose.position.y = x_new_(1);
     marker.pose.position.z = x_new_(2);
     marker.color.r = 1.0;
     marker.color.g = 0.0;
-    marker.color.b = 0.0;
-    marker_pub_->publish(marker);
+    marker_array.markers.push_back(marker);
+    marker_pub_->publish(marker_array);
 }
 
 int main(int argc, char **argv)

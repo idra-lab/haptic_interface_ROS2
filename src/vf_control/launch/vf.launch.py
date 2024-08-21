@@ -49,7 +49,7 @@ def generate_launch_description():
     vf_params = get_package_share_directory('vf_control') + "/config/parameters.yaml"
     print("VF PARAMETERS FILE: ",vf_params)
     vf_node = TimerAction(
-        period=4.0,
+        period=2.5,
         actions=[
             Node(
                 package="vf_control",
@@ -57,7 +57,10 @@ def generate_launch_description():
                 # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
                     ParameterFile(vf_params)
-                ]
+                ],
+                output='screen',
+                emulate_tty=True,
+                arguments=[('__log_level:=debug')]
             )
         ]
     )

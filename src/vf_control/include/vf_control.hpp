@@ -1,8 +1,8 @@
 #ifndef VF_CONTROL_HPP
 #define VF_CONTROL_HPP
 
-#include "open3d/Open3D.h"
-#include "open3d/t/geometry/RaycastingScene.h"
+
+
 #include <Eigen/Dense>
 
 #include <memory>
@@ -22,7 +22,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
-#include "visualization_msgs/msg/marker.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -50,6 +50,10 @@
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/transform_broadcaster.h"
+// my includes
+#include "closest_on_triangle.hpp"
+#include "mesh.hpp"
+#include "vf_computation.hpp"
 
 class VFControl : public rclcpp::Node
 {
@@ -99,7 +103,7 @@ private:
     rclcpp::TimerBase::SharedPtr visualizationThread_;
 
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr vf_sub_;
-    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
 
     Eigen::Vector3d x_new_, vf_pose_;
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
