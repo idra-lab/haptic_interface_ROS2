@@ -35,7 +35,6 @@ VFControl::VFControl(
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-
     if (!open3d::io::ReadTriangleMesh(load_path_, *o3d_mesh))
     {
         std::cerr << "Failed to load mesh from file: " << load_path_ << std::endl;
@@ -50,33 +49,13 @@ VFControl::VFControl(
         std::cerr << "The loaded mesh contains no vertices." << std::endl;
         rclcpp::shutdown();
     }
+    o3d_mesh->ComputeVertexNormals();
+    o3d_mesh->OrientTriangles();
+    o3d_mesh->NormalizeNormals();
 
     // Convert vertices to a PointCloud
     auto point_cloud = std::make_shared<open3d::geometry::PointCloud>();
     point_cloud->points_ = o3d_mesh->vertices_;
-
-    // Build a KDTree for the point cloud
-    open3d::geometry::KDTreeFlann kdtree;
-    kdtree.SetGeometry(*point_cloud);
-
-    RCLCPP_INFO_STREAM(this->get_logger(), "Created KDTree");
-
-    // Example: Query the nearest neighbor of the first vertex
-    std::vector<int> indices;
-    std::vector<double> distances;
-    open3d::geometry::KDTreeSearchParamKNN search_param_knn(1); // 1 nearest neighbor
-
-    kdtree.SearchKNN(point_cloud->points_[0], 1, indices, distances);
-
-    if (!indices.empty())
-    {
-        std::cout << "Nearest neighbor index: " << indices[0] << ", distance: " << distances[0] << std::endl;
-    }
-    else
-    {
-        std::cerr << "No nearest neighbors found." << std::endl;
-    }
-    // convert to eigen
 
     RCLCPP_INFO_STREAM(this->get_logger(), "Computing mesh properties...");
 
@@ -88,9 +67,8 @@ void VFControl::out_virtuose_pose_CB(
     x_new_ << msg->virtuose_pose.translation.x, msg->virtuose_pose.translation.y,
         msg->virtuose_pose.translation.z;
 
-    Eigen::Vector3d delta_x = enforce_virtual_fixture(*mesh_, x_new_, vf_pose_, 0.03);
-    vf_pose_ += 0.9*delta_x;
-    std::cout << "VF pose: " << vf_pose_ << std::endl;
+    Eigen::Vector3d delta_x = enforce_virtual_fixture(*mesh_, x_new_, vf_pose_, radius_, constraint_planes_);
+    vf_pose_ += 0.9 * delta_x;
 }
 
 void VFControl::call_impedance_service()
@@ -162,7 +140,7 @@ void VFControl::call_impedance_service()
     rclcpp::sleep_for(1s); // idk why it is needed
     AddMesh();
     visualizationThread_ = this->create_wall_timer(
-        30ms, std::bind(&VFControl::UpdateScene, this));
+        10ms, std::bind(&VFControl::UpdateScene, this));
     RCLCPP_INFO(this->get_logger(), "\033[0;32mVisualization thread started\033[0m");
 }
 void VFControl::out_virtuose_statusCB(
@@ -224,6 +202,7 @@ void VFControl::AddMesh()
     marker_array.markers.push_back(marker);
     marker_pub_->publish(marker_array);
 }
+
 void VFControl::UpdateScene()
 {
     geometry_msgs::msg::PoseStamped target_pose;
@@ -263,6 +242,36 @@ void VFControl::UpdateScene()
     marker.color.r = 1.0;
     marker.color.g = 0.0;
     marker_array.markers.push_back(marker);
+    // marker_pub_->publish(marker_array);
+    // Visualize plane constraints as collapsed boxes
+    marker.ns = "constraint_planes";
+    marker.type = visualization_msgs::msg::Marker::CUBE;
+    marker.scale.x = 0.1;
+    marker.scale.y = 0.1;
+    marker.scale.z = 0.0001;
+    marker.color.r = 1.0;
+    marker.color.g = 1.0;
+    marker.color.b = 0.0;
+    Eigen::Vector3d z_axis(0.0, 0.0, 1.0);
+    for (size_t i = 0; i < constraint_planes_.size(); i++)
+    {
+        auto n = constraint_planes_[i].first;
+        n = n.normalized();
+        auto p = constraint_planes_[i].second;
+        auto rotation_axis = z_axis.cross(n);
+        auto rotation_angle = std::acos(z_axis.dot(n));
+        Eigen::Quaterniond q;
+        q = Eigen::AngleAxisd(rotation_angle, rotation_axis);
+        marker.id = i;
+        marker.pose.orientation.x = q.x();
+        marker.pose.orientation.y = q.y();
+        marker.pose.orientation.z = q.z();
+        marker.pose.orientation.w = q.w();
+        marker.pose.position.x = p(0);
+        marker.pose.position.y = p(1);
+        marker.pose.position.z = p(2);
+        marker_array.markers.push_back(marker);
+    }
     marker_pub_->publish(marker_array);
 }
 

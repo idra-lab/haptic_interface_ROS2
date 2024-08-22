@@ -13,6 +13,7 @@
 #include "location.hpp"
 // nlohmann json
 #include "json.hpp"
+#include "closest_on_triangle.hpp"
 
 struct hash_tuple
 {
@@ -113,6 +114,7 @@ public:
     {
         if (load_adjacency_dict("adjacency_dict.txt"))
         {
+            std::cout <<"Loaded adjacency dict from file" << std::endl;
             return;
         }
 

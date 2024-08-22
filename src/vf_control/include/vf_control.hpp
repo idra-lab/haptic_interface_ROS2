@@ -110,7 +110,7 @@ private:
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-
+    std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> constraint_planes_;
     // VARIABLES
     std::string base_link_name_ = "world";
     std::string load_path_ = "/home/nardi/SKEL_WS/ros2_ws/projected_skel.ply";
