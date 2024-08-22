@@ -24,20 +24,20 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Open3D REQUIRED)
-# if (Open3D_FOUND)
-#     message(STATUS "Found Open3D installed locally")
-# else()
-#     message(STATUS "Open3D not found, downloading...")
-#     include(FetchContent)
-#     FetchContent_Declare(
-#         Open3D
-#         DOWNLOAD_EXTRACT_TIMESTAMP NEW
-#         URL "https://github.com/isl-org/Open3D/releases/download/v0.18.0/open3d-devel-linux-x86_64-cxx11-abi-0.18.0.tar.xz"
-#     )
-#     FetchContent_MakeAvailable(Open3D)
-#     find_package(Open3D REQUIRED HINTS ${open3d_SOURCE_DIR})
-# endif()
+find_package(Open3D QUIET)
+if (Open3D_FOUND)
+    message(STATUS "Found Open3D installed locally")
+else()
+    message(STATUS "Open3D not found, downloading...")
+    include(FetchContent)
+    FetchContent_Declare(
+        Open3D
+        DOWNLOAD_EXTRACT_TIMESTAMP NEW
+        URL "https://github.com/isl-org/Open3D/releases/download/v0.18.0/open3d-devel-linux-x86_64-cxx11-abi-0.18.0.tar.xz"
+    )
+    FetchContent_MakeAvailable(Open3D)
+    find_package(Open3D REQUIRED HINTS ${open3d_SOURCE_DIR})
+endif()
 
 set (QPOASES_INSTALL_DIR ${CMAKE_BINARY_DIR}/qpoases_install)
 include(ExternalProject)
@@ -64,9 +64,12 @@ add_library(qpoases::qpoases ALIAS qpoases_helper)
 # message(STATUS "Open3D include dir: ${Open3D_INCLUDE_DIRS}")
 
 add_executable(vf_control src/vf_control.cpp)
+add_executable(vf_control_test src/vf_control_test.cpp)
 add_executable(mesh_test src/mesh_test.cpp)
 
 ament_target_dependencies(vf_control rclcpp raptor_api_interfaces haption_raptor_api tf2_ros tf2_geometry_msgs visualization_msgs)
+ament_target_dependencies(vf_control_test rclcpp tf2_geometry_msgs visualization_msgs raptor_api_interfaces)
+
 include_directories(vf_control PUBLIC include)
 include_directories(mesh_test PUBLIC include)
 
@@ -79,12 +82,13 @@ include_directories(mesh_test PUBLIC include)
 # )
 
 target_link_libraries(vf_control Eigen3::Eigen Open3D::Open3D qpoases::qpoases)
+target_link_libraries(vf_control_test Eigen3::Eigen Open3D::Open3D qpoases::qpoases)
 target_link_libraries(mesh_test Eigen3::Eigen Open3D::Open3D)
 
 install(TARGETS ${This} vf_control
   DESTINATION lib/${PROJECT_NAME})
 
-install(TARGETS ${This} mesh_test
+install(TARGETS ${This} mesh_test vf_control_test
 DESTINATION lib/${PROJECT_NAME})
 
 install(

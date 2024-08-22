@@ -49,7 +49,7 @@ VFControl::VFControl(
         std::cerr << "The loaded mesh contains no vertices." << std::endl;
         rclcpp::shutdown();
     }
-    o3d_mesh->ComputeVertexNormals();
+    o3d_mesh->ComputeTriangleNormals();
     o3d_mesh->OrientTriangles();
     o3d_mesh->NormalizeNormals();
 
@@ -59,7 +59,7 @@ VFControl::VFControl(
 
     RCLCPP_INFO_STREAM(this->get_logger(), "Computing mesh properties...");
 
-    mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->vertex_normals_);
+    mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->triangle_normals_);
 }
 void VFControl::out_virtuose_pose_CB(
     const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg)
