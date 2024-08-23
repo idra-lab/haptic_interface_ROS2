@@ -3,7 +3,8 @@ using namespace std::chrono_literals;
 using std::placeholders::_1;
 VFControl::VFControl(const std::string &name, const std::string &namespace_,
                      const rclcpp::NodeOptions &options)
-    : Node(name, namespace_, options) {
+    : Node(name, namespace_, options)
+{
   target_pos_publisher_ =
       this->create_publisher<geometry_msgs::msg::PoseStamped>(
           "/target_frame_vf", 1);
@@ -19,18 +20,22 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-  auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-  if (!open3d::io::ReadTriangleMesh(load_path_, *o3d_mesh)) {
-    std::cerr << "Failed to load mesh from file: " << load_path_ << std::endl;
-    rclcpp::shutdown();
-  }
-
-  RCLCPP_INFO_STREAM(this->get_logger(),
+  // auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
+  // if (!open3d::io::ReadTriangleMesh(load_path_, *o3d_mesh)) {
+  //   std::cerr << "Failed to load mesh from file: " << load_path_ << std::endl;
+  //   rclcpp::shutdown();
+  // }
+  open3d::data::BunnyMesh dataset;
+  auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
+  // dump mesh
+  open3d::io::WriteTriangleMesh(load_path_, *o3d_mesh);
+    RCLCPP_INFO_STREAM(this->get_logger(),
                      "Loaded mesh with "
                          << o3d_mesh->vertices_.size() << " vertices and "
                          << o3d_mesh->triangles_.size() << " triangles.");
   // Ensure the mesh has vertices
-  if (o3d_mesh->vertices_.empty()) {
+  if (o3d_mesh->vertices_.empty())
+  {
     std::cerr << "The loaded mesh contains no vertices." << std::endl;
     rclcpp::shutdown();
   }
@@ -46,7 +51,7 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
 
   mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_,
                                  o3d_mesh->triangle_normals_);
-  rclcpp::sleep_for(1s);  // idk why it is needed
+  rclcpp::sleep_for(1s); // idk why it is needed
   AddMesh();
   visualizationThread_ =
       this->create_wall_timer(10ms, std::bind(&VFControl::UpdateScene, this));
@@ -55,7 +60,8 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
 }
 
 void VFControl::bag_callback(
-    const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+    const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+{
   x_new_ << msg->pose.position.x, msg->pose.position.y,
       msg->pose.position.z - 0.02;
   ResetPlanes();
@@ -64,7 +70,8 @@ void VFControl::bag_callback(
   vf_pose_ += 0.9 * delta_x;
 }
 
-void VFControl::AddMesh() {
+void VFControl::AddMesh()
+{
   visualization_msgs::msg::MarkerArray marker_array;
   visualization_msgs::msg::Marker marker;
   marker.header.frame_id = base_link_name_;
@@ -90,20 +97,23 @@ void VFControl::AddMesh() {
   marker_array.markers.push_back(marker);
   marker_pub_->publish(marker_array);
 }
-void VFControl::ResetPlanes() {
+void VFControl::ResetPlanes()
+{
   visualization_msgs::msg::MarkerArray marker_array;
   visualization_msgs::msg::Marker marker;
   marker.header.frame_id = base_link_name_;
   marker.header.stamp = get_clock()->now();
   marker.ns = "virtual_fixture";
   marker.type = visualization_msgs::msg::Marker::DELETEALL;
-  for (size_t i = 0; i < constraint_planes_.size(); i++) {
+  for (size_t i = 0; i < constraint_planes_.size(); i++)
+  {
     marker.id = i;
     marker_array.markers.push_back(marker);
   }
   marker_pub_->publish(marker_array);
 }
-void VFControl::UpdateScene() {
+void VFControl::UpdateScene()
+{
   geometry_msgs::msg::PoseStamped target_pose;
   target_pose.header.frame_id = base_link_name_;
   target_pose.header.stamp = get_clock()->now();
@@ -151,7 +161,8 @@ void VFControl::UpdateScene() {
   marker.color.g = 1.0;
   marker.color.b = 0.0;
   Eigen::Vector3d z_axis(0.0, 0.0, 1.0);
-  for (size_t i = 0; i < constraint_planes_.size(); i++) {
+  for (size_t i = 0; i < constraint_planes_.size(); i++)
+  {
     auto n = constraint_planes_[i].first;
     n = n.normalized();
     auto p = constraint_planes_[i].second;
@@ -172,7 +183,8 @@ void VFControl::UpdateScene() {
   marker_pub_->publish(marker_array);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting VF Control node");
 
   rclcpp::init(argc, argv);

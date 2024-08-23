@@ -7,7 +7,6 @@
 #include <sys/types.h>
 #include <pwd.h>
 
-
 void testClosestOnTriangle()
 {
     // Test Case 1: Point at vertex P1
@@ -86,18 +85,18 @@ void colorMeshFacesNew(open3d::t::geometry::TriangleMesh &mesh_new, int faceIdx,
 {
     // ComputeVertexNormals
     // mesh_new.ComputeTriangleNormals();
-    std::cout <<"A "<< std::endl;
+    std::cout << "A " << std::endl;
 
     auto faces = mesh_new.GetTriangleIndices();
-    std::cout <<"B " << std::endl;
+    std::cout << "B " << std::endl;
 
     // Set the colors to the mesh
     auto colors = open3d::core::Tensor::Ones({faces.GetShape()[0], 3}, open3d::core::Dtype::Float32);
 
     open3d::core::SizeVector faces_size = faces.GetShape();
-    std::cout <<"Faces size " << faces_size.ToString() << std::endl;
+    std::cout << "Faces size " << faces_size.ToString() << std::endl;
     open3d::core::SizeVector colors_size = colors.GetShape();
-    std::cout <<"Colors size " << colors_size.ToString() << std::endl;
+    std::cout << "Colors size " << colors_size.ToString() << std::endl;
     // Set the colors to the mesh
     colors[faceIdx][0] = 1;
     colors[faceIdx][1] = 0;
@@ -133,37 +132,55 @@ void colorVertices(open3d::geometry::TriangleMesh &mesh, int faceIdx, std::vecto
         colors[v3][2] = 1;
     }
     mesh.vertex_colors_ = colors;
-    
 }
 void testAdjacencyList()
 {
     open3d::data::BunnyMesh dataset;
     auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
-    auto o3d_mesh_new = open3d::t::geometry::TriangleMesh::FromLegacy(*o3d_mesh);
-    std::shared_ptr<open3d::t::geometry::TriangleMesh> o3d_mesh_new_ptr = std::make_shared<open3d::t::geometry::TriangleMesh>(o3d_mesh_new);
 
     Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->vertex_normals_);
     std::cout << "Number of mesh vertices: " << o3d_mesh->vertices_.size() << std::endl;
     // random sample a face idx and color the neighbors
     for (int i = 0; i < 10; i++)
     {
-        int face_idx = 10; // rand() % mesh.faces.size();
+        int face_idx = rand() % mesh.faces.size();
         // iter locations
         for (int loc = 1; loc <= 6; loc++)
         {
             {
+                std::vector<std::shared_ptr<const open3d::geometry::Geometry>> geometries;
+                auto sphere_face = open3d::geometry::TriangleMesh::CreateSphere(0.00025);
+                // compute the center of the face
+                Eigen::Vector3d center = (o3d_mesh->vertices_[o3d_mesh->triangles_[face_idx][0]] +
+                                          o3d_mesh->vertices_[o3d_mesh->triangles_[face_idx][1]] +
+                                          o3d_mesh->vertices_[o3d_mesh->triangles_[face_idx][2]]) /
+                                         3.0;
+                sphere_face->Translate(center, false);
+                sphere_face->ComputeVertexNormals();
+                sphere_face->PaintUniformColor(Eigen::Vector3d(1, 0, 0));
+                geometries.push_back(sphere_face);
                 std::cout << "Retrieving neighbors for face " << face_idx << " at location "
                           << LocationToString(static_cast<Location>(loc)) << std::endl;
                 auto neighbors = mesh.adjacency_dict.at({face_idx, intToLocation(loc)});
                 std::cout << "Face " << face_idx << " has neighbors: ";
+                geometries.push_back(o3d_mesh);
                 for (auto neighbor : neighbors)
                 {
+                    // create sphere in the center of the face
                     std::cout << neighbor << " ";
+                    auto sphere = open3d::geometry::TriangleMesh::CreateSphere(0.00025);
+                    // compute the center of the face
+                    Eigen::Vector3d center = (o3d_mesh->vertices_[o3d_mesh->triangles_[neighbor][0]] +
+                                              o3d_mesh->vertices_[o3d_mesh->triangles_[neighbor][1]] +
+                                              o3d_mesh->vertices_[o3d_mesh->triangles_[neighbor][2]]) /
+                                             3.0;
+                    sphere->Translate(center, false);
+                    sphere->ComputeVertexNormals();
+                    sphere->PaintUniformColor(Eigen::Vector3d(0, 1, 0));
+                    geometries.push_back(sphere);
+                    std::cout << "Coloring vertices " << std::endl;
                 }
-                std::cout << "Coloring vertices "<< std::endl;
-                colorMeshFacesNew(*o3d_mesh_new_ptr, face_idx, neighbors);
-                o3d_mesh_new_ptr->ComputeVertexNormals();
-                open3d::visualization::Draw({o3d_mesh_new_ptr});
+                open3d::visualization::DrawGeometries(geometries);
             }
         }
     }

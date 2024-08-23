@@ -34,7 +34,17 @@ VFControl::VFControl(
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-    auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
+    // auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
+    open3d::data::KnotMesh dataset;
+    auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
+    o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
+    // dump mesh
+    open3d::io::WriteTriangleMesh(load_path_, *o3d_mesh);
+    RCLCPP_INFO(this->get_logger(), "Mesh Dumped");
+    AddMesh();
+
+    rclcpp::sleep_for(1s); // idk why it is needed
+    RCLCPP_INFO_STREAM(this->get_logger(), "Loading mesh from file: " << load_path_);
     if (!open3d::io::ReadTriangleMesh(load_path_, *o3d_mesh))
     {
         std::cerr << "Failed to load mesh from file: " << load_path_ << std::endl;
@@ -58,7 +68,6 @@ VFControl::VFControl(
     point_cloud->points_ = o3d_mesh->vertices_;
 
     RCLCPP_INFO_STREAM(this->get_logger(), "Computing mesh properties...");
-
     mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->triangle_normals_);
 }
 void VFControl::out_virtuose_pose_CB(
@@ -138,7 +147,7 @@ void VFControl::call_impedance_service()
     // impedanceThread_ = this->create_wall_timer(
     //     1ms, std::bind(&VFControl::impedanceThread, this));
     rclcpp::sleep_for(1s); // idk why it is needed
-    AddMesh();
+
     visualizationThread_ = this->create_wall_timer(
         10ms, std::bind(&VFControl::UpdateScene, this));
     RCLCPP_INFO(this->get_logger(), "\033[0;32mVisualization thread started\033[0m");
@@ -200,7 +209,11 @@ void VFControl::AddMesh()
     marker.color.a = 1.0;
     RCLCPP_INFO(this->get_logger(), "Rib cage mesh loaded");
     marker_array.markers.push_back(marker);
-    marker_pub_->publish(marker_array);
+    for (int i = 0; i < 20; i++)
+    {
+        marker_pub_->publish(marker_array);
+        rclcpp::sleep_for(100ms);
+    }
 }
 
 void VFControl::UpdateScene()
@@ -244,10 +257,14 @@ void VFControl::UpdateScene()
     marker_array.markers.push_back(marker);
     // marker_pub_->publish(marker_array);
     // Visualize plane constraints as collapsed boxes
-    marker.ns = "constraint_planes";
+    visualization_msgs::msg::Marker delete_marker;
+    delete_marker.ns = "constraint_planes";
+    delete_marker.type = visualization_msgs::msg::Marker::DELETEALL;
+    // delete all previous markers
+    marker_array.markers.push_back(delete_marker);
     marker.type = visualization_msgs::msg::Marker::CUBE;
-    marker.scale.x = 0.1;
-    marker.scale.y = 0.1;
+    marker.scale.x = 0.04;
+    marker.scale.y = 0.04;
     marker.scale.z = 0.0001;
     marker.color.r = 1.0;
     marker.color.g = 1.0;
