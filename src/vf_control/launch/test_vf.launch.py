@@ -36,6 +36,7 @@ def generate_launch_description():
                 parameters=[
                     ParameterFile(vf_params)
                 ],
+                prefix=["xterm -fa 'Monospace' -fs 14 -e "],
                 output='screen',
                 emulate_tty=True,
                 arguments=[('__log_level:=debug')]

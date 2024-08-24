@@ -238,9 +238,9 @@ void VFControl::UpdateScene()
     marker.pose.position.x = vf_pose_(0);
     marker.pose.position.y = vf_pose_(1);
     marker.pose.position.z = vf_pose_(2);
-    marker.scale.x = 0.03;
-    marker.scale.y = 0.03;
-    marker.scale.z = 0.03;
+    marker.scale.x = radius_;
+    marker.scale.y = radius_;
+    marker.scale.z = radius_;
     marker.color.a = 1.0;
     marker.color.r = 0.0;
     marker.color.g = 1.0;

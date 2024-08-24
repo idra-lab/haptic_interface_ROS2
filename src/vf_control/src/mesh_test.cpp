@@ -135,8 +135,9 @@ void colorVertices(open3d::geometry::TriangleMesh &mesh, int faceIdx, std::vecto
 }
 void testAdjacencyList()
 {
-    open3d::data::BunnyMesh dataset;
+    open3d::data::KnotMesh dataset;
     auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
+    o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
 
     Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->vertex_normals_);
     std::cout << "Number of mesh vertices: " << o3d_mesh->vertices_.size() << std::endl;
@@ -149,7 +150,7 @@ void testAdjacencyList()
         {
             {
                 std::vector<std::shared_ptr<const open3d::geometry::Geometry>> geometries;
-                auto sphere_face = open3d::geometry::TriangleMesh::CreateSphere(0.00025);
+                auto sphere_face = open3d::geometry::TriangleMesh::CreateSphere(0.002);
                 // compute the center of the face
                 Eigen::Vector3d center = (o3d_mesh->vertices_[o3d_mesh->triangles_[face_idx][0]] +
                                           o3d_mesh->vertices_[o3d_mesh->triangles_[face_idx][1]] +
@@ -162,13 +163,13 @@ void testAdjacencyList()
                 std::cout << "Retrieving neighbors for face " << face_idx << " at location "
                           << LocationToString(static_cast<Location>(loc)) << std::endl;
                 auto neighbors = mesh.adjacency_dict.at({face_idx, intToLocation(loc)});
-                std::cout << "Face " << face_idx << " has neighbors: ";
+                std::cout << "Face " << face_idx << " has neighbors: \n";
                 geometries.push_back(o3d_mesh);
                 for (auto neighbor : neighbors)
                 {
                     // create sphere in the center of the face
-                    std::cout << neighbor << " ";
-                    auto sphere = open3d::geometry::TriangleMesh::CreateSphere(0.00025);
+                    std::cout << neighbor << std::endl;
+                    auto sphere = open3d::geometry::TriangleMesh::CreateSphere(0.002);
                     // compute the center of the face
                     Eigen::Vector3d center = (o3d_mesh->vertices_[o3d_mesh->triangles_[neighbor][0]] +
                                               o3d_mesh->vertices_[o3d_mesh->triangles_[neighbor][1]] +
@@ -178,7 +179,6 @@ void testAdjacencyList()
                     sphere->ComputeVertexNormals();
                     sphere->PaintUniformColor(Eigen::Vector3d(0, 1, 0));
                     geometries.push_back(sphere);
-                    std::cout << "Coloring vertices " << std::endl;
                 }
                 open3d::visualization::DrawGeometries(geometries);
             }

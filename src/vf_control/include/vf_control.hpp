@@ -45,6 +45,7 @@ class VFControl : public rclcpp::Node {
   // void UpdateRviz(geometry_msgs::msg::PoseStamped pose, double radius,
   // std::vector<double> color, uint id); void ClearRviz(); void
   // UpdateRibCageRviz();
+  void KeyboardInputLoop();
 
   void SetWrenchCB(const geometry_msgs::msg::WrenchStamped target_wrench);
   void out_virtuose_pose_CB(
@@ -94,7 +95,7 @@ class VFControl : public rclcpp::Node {
   std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> constraint_planes_;
   // VARIABLES
   std::string base_link_name_ = "world";
-  std::string load_path_ = "/home/nardi/SKEL_WS/ros2_ws/projected_skel.obj";
+  std::string load_path_ = "/home/hydran00/SKEL_WS/ros2_ws/projected_skel.obj";
 
   int client__id_;
   int ctr_;
