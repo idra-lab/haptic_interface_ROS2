@@ -1,0 +1,63 @@
+Starting >>> vf_control
+--- stderr: vf_control
+In file included from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/vf_control.hpp:34,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/src/vf_control_test.cpp:1:
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/mesh.hpp:123: warning: ignoring ‘#pragma omp parallel’ [-Wunknown-pragmas]
+  123 | #pragma omp parallel for
+      | 
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/mesh.hpp:131: warning: ignoring ‘#pragma omp critical’ [-Wunknown-pragmas]
+  131 | #pragma omp critical
+      | 
+In file included from /home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/QProblemB.hpp:1014,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/QProblem.hpp:41,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/SQProblem.hpp:42,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/qp_wrapper.hpp:5,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/vf_computation.hpp:5,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/vf_control.hpp:35,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/src/vf_control_test.cpp:1:
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/QProblemB.ipp: In member function ‘void qpOASES::QProblemB::applyGivens(qpOASES::real_t, qpOASES::real_t, qpOASES::real_t, qpOASES::real_t, qpOASES::real_t, qpOASES::real_t&, qpOASES::real_t&) const’:
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/QProblemB.ipp:447:68: warning: unused parameter ‘nu’ [-Wunused-parameter]
+  447 | inline void QProblemB::applyGivens(     real_t c, real_t s, real_t nu, real_t xold, real_t yold,
+      |                                                             ~~~~~~~^~
+In file included from /home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/QProblem.hpp:43,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/SQProblem.hpp:42,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/qp_wrapper.hpp:5,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/vf_computation.hpp:5,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/vf_control.hpp:35,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/src/vf_control_test.cpp:1:
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/ConstraintProduct.hpp: In copy constructor ‘qpOASES::ConstraintProduct::ConstraintProduct(const qpOASES::ConstraintProduct&)’:
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/ConstraintProduct.hpp:64:66: warning: unused parameter ‘toCopy’ [-Wunused-parameter]
+   64 |                 ConstraintProduct(      const ConstraintProduct &toCopy /**< Rhs object. */
+      |                                         ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/ConstraintProduct.hpp: In member function ‘qpOASES::ConstraintProduct& qpOASES::ConstraintProduct::operator=(const qpOASES::ConstraintProduct&)’:
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/build/vf_control/qpoases_install/include/qpOASES/ConstraintProduct.hpp:71:74: warning: unused parameter ‘toCopy’ [-Wunused-parameter]
+   71 |                 ConstraintProduct &operator=(   const ConstraintProduct &toCopy /**< Rhs object. */
+      |                                                 ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~
+In file included from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/vf_control.hpp:35,
+                 from /home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/src/vf_control_test.cpp:1:
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/vf_computation.hpp: In function ‘Eigen::Vector3d enforce_virtual_fixture(Mesh&, const Vector3d&, const Vector3d&, double, std::vector<std::pair<Eigen::Matrix<double, 3, 1>, Eigen::Matrix<double, 3, 1> > >&)’:
+/home/hydran00/Ultrasound-Demo/leader/haption_ws/src/vf_control/include/vf_computation.hpp:208:7: warning: unused variable ‘iteration’ [-Wunused-variable]
+  208 |   int iteration = 0;
+      |       ^~~~~~~~~
+---
+Finished <<< vf_control [17.9s]
+[18.307s] ERROR:dbus.connection:Unable to set arguments ('colcon', 0, '/usr/lib/python3/dist-packages/colcon_notification/desktop_notification/image/colcon-warning.ico', '`colcon build` with stderr output', '/home/hydran00/Ultrasound-Demo/leader/haption_ws', [], {'transient': dbus.Byte(1)}, -1) according to signature 'susssasa{ss}i': <class 'TypeError'>: Expected a string or unicode object
+[18.308s] ERROR:colcon.colcon_notification.desktop_notification:Exception in desktop notification extension 'notify2': Expected a string or unicode object
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/colcon_notification/desktop_notification/__init__.py", line 106, in notify
+    retval = extension.notify(
+  File "/usr/lib/python3/dist-packages/colcon_notification/desktop_notification/notify2.py", line 51, in notify
+    self._last_notification.show()
+  File "/usr/lib/python3/dist-packages/notify2.py", line 181, in show
+    nid = dbus_iface.Notify(appname,       # app_name       (spec names)
+  File "/usr/lib/python3/dist-packages/dbus/proxies.py", line 72, in __call__
+    return self._proxy_method(*args, **keywords)
+  File "/usr/lib/python3/dist-packages/dbus/proxies.py", line 141, in __call__
+    return self._connection.call_blocking(self._named_service,
+  File "/usr/lib/python3/dist-packages/dbus/connection.py", line 643, in call_blocking
+    message.append(signature=signature, *args)
+TypeError: Expected a string or unicode object
+
+
+Summary: 1 package finished [18.2s]
+  1 package had stderr output: vf_control

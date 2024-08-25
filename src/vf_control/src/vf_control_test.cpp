@@ -1,8 +1,9 @@
 #include "vf_control.hpp"
 
+#include <stdio.h>
 #include <termios.h>
 #include <unistd.h>
-#include <stdio.h>
+
 #include <iostream>
 #include <thread>
 
@@ -19,18 +20,20 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
   marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
       "visualization_marker", 1);
 
-  x_new_ << 0.0, 0.0, 0.1;
-  vf_pose_ << 0.0, 0.0, 0.1;
+  x_new_ << 0.0, 0.0, 0.3;
+  vf_pose_ << 0.0, 0.0, 0.3;
 
   // Initializes the TF2 transform listener and buffer
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-  open3d::data::KnotMesh dataset;
-  auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
-  o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
+  // open3d::data::KnotMesh dataset;
+  // auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
+  // o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
+  auto o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2,40);
   open3d::io::WriteTriangleMesh(load_path_, *o3d_mesh);
+
   RCLCPP_INFO_STREAM(this->get_logger(),
                      "Loaded mesh with "
                          << o3d_mesh->vertices_.size() << " vertices and "
@@ -95,14 +98,14 @@ void VFControl::KeyboardInputLoop() {
     if (c == 'e') direction(2) -= 1;
     x_new_ = x_new_ + direction * 0.003;
     ResetPlanes();
-    Eigen::Vector3d delta_x = enforce_virtual_fixture(*mesh_, x_new_, vf_pose_, radius_, constraint_planes_);
+    Eigen::Vector3d delta_x = enforce_virtual_fixture(
+        *mesh_, x_new_, vf_pose_, radius_, constraint_planes_);
     vf_pose_ += 0.9 * delta_x;
     direction << 0.0, 0.0, 0.0;
   }
 
   // Restore the old settings
   tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-
 }
 
 void VFControl::AddMesh() {
