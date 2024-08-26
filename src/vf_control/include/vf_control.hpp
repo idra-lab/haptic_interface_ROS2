@@ -95,7 +95,7 @@ class VFControl : public rclcpp::Node {
   std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> constraint_planes_;
   // VARIABLES
   std::string base_link_name_ = "world";
-  std::string load_path_ = "/home/hydran00/SKEL_WS/ros2_ws/projected_skel.obj";
+  std::string input_mesh_path_, output_mesh_path_, mesh_type_;
 
   int client__id_;
   int ctr_;

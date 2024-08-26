@@ -39,15 +39,15 @@ VFControl::VFControl(
     auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
     o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
     // dump mesh
-    open3d::io::WriteTriangleMesh(load_path_, *o3d_mesh);
+    open3d::io::WriteTriangleMesh(mesh_path_, *o3d_mesh);
     RCLCPP_INFO(this->get_logger(), "Mesh Dumped");
     AddMesh();
 
     rclcpp::sleep_for(1s); // idk why it is needed
-    RCLCPP_INFO_STREAM(this->get_logger(), "Loading mesh from file: " << load_path_);
-    if (!open3d::io::ReadTriangleMesh(load_path_, *o3d_mesh))
+    RCLCPP_INFO_STREAM(this->get_logger(), "Loading mesh from file: " << mesh_path_);
+    if (!open3d::io::ReadTriangleMesh(mesh_path_, *o3d_mesh))
     {
-        std::cerr << "Failed to load mesh from file: " << load_path_ << std::endl;
+        std::cerr << "Failed to load mesh from file: " << mesh_path_ << std::endl;
         rclcpp::shutdown();
     }
 
@@ -197,7 +197,7 @@ void VFControl::AddMesh()
     marker.pose.position.x = 0.0;
     marker.pose.position.y = 0.0;
     marker.pose.position.z = 0.0;
-    marker.mesh_resource = "file://" + load_path_;
+    marker.mesh_resource = "file://" + mesh_path_;
     marker.mesh_use_embedded_materials = true;
     marker.scale.x = 1.0;
     marker.scale.y = 1.0;

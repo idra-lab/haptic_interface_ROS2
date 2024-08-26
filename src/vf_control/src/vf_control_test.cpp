@@ -14,28 +14,42 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
                      const rclcpp::NodeOptions &options)
     : Node(name, namespace_, options) {
   target_pos_publisher_ =
-      this->create_publisher<geometry_msgs::msg::PoseStamped>(
-          "/target_frame_vf", 1);
+      this->create_publisher<geometry_msgs::msg::PoseStamped>("target_frame_vf",
+                                                              1);
 
   marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
       "visualization_marker", 1);
 
-  x_new_ << -0.09, -0.0024, 0.20140033;
-  vf_pose_ << -0.09, -0.0024, 0.20140033;
-
-  // x_new_ << -0.0, 0.0, 0.2;
-  // vf_pose_ << -0.0, 0.0, 0.2;
+  this->mesh_type_ = this->get_parameter("mesh_type").as_string();
+  this->input_mesh_path_ = this->get_parameter("input_mesh_path").as_string();
+  this->output_mesh_path_ = this->get_parameter("output_mesh_path").as_string();
 
   // Initializes the TF2 transform listener and buffer
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-  open3d::data::KnotMesh dataset;
-  // auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
-  // o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
-  auto o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 40);
-  open3d::io::WriteTriangleMesh(load_path_, *o3d_mesh);
+  x_new_ << -0.0, 0.0, 0.2;
+  vf_pose_ << -0.0, 0.0, 0.2;
+  auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
+  if (mesh_type_ == "bunny") {
+    open3d::data::BunnyMesh dataset;
+    o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
+  } else if (mesh_type_ == "knot") {
+    open3d::data::KnotMesh dataset;
+    o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
+    o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
+  } else if (mesh_type_ == "sphere") {
+    x_new_ << -0.09, -0.0024, 0.20140033;
+    vf_pose_ << -0.09, -0.0024, 0.20140033;
+    o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 20);
+  } else if (mesh_type_ == "file") {
+    open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh);
+  } else {
+    std::cerr << "Invalid mesh type argument" << std::endl;
+    rclcpp::shutdown();
+  }
+  open3d::io::WriteTriangleMesh(output_mesh_path_, *o3d_mesh);
 
   RCLCPP_INFO_STREAM(this->get_logger(),
                      "Loaded mesh with "
@@ -126,7 +140,7 @@ void VFControl::AddMesh() {
   marker.pose.position.x = 0.0;
   marker.pose.position.y = 0.0;
   marker.pose.position.z = 0.0;
-  marker.mesh_resource = "file://" + load_path_;
+  marker.mesh_resource = "file://" + output_mesh_path_;
   marker.mesh_use_embedded_materials = true;
   marker.scale.x = 1.0;
   marker.scale.y = 1.0;
