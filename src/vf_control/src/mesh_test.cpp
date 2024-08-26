@@ -232,16 +232,26 @@ void testAdjacencyList() {
     }
   }
 }
+void testExtrusion(){
+  auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
+  open3d::io::ReadTriangleMesh("/home/nardi/SKEL_WS/ros2_ws/projected_skel.obj", *o3d_mesh);
+  open3d::visualization::DrawGeometries({o3d_mesh});
+  o3d_mesh->ComputeTriangleNormals();
+  Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_,
+            o3d_mesh->vertex_normals_);
+  mesh.extrudeMeshRadially(Eigen::Vector3d(0, 0, 0), 0.05);
+  auto o3d_mesh_extruded = std::make_shared<open3d::geometry::TriangleMesh>();
+  o3d_mesh_extruded->vertices_ = mesh.vertices;
+  o3d_mesh_extruded->triangles_ = mesh.faces;
+  o3d_mesh_extruded->ComputeTriangleNormals();
+  open3d::visualization::DrawGeometries({o3d_mesh_extruded});
 
+
+}
 int main(int argc, char **argv) {
-  auto &app = open3d::visualization::gui::Application::GetInstance();
-  struct passwd *pw = getpwuid(getuid());
-  const char *homedir = pw->pw_dir;
-  std::string homedir_str(homedir);
-  std::string path = "/usr/local/bin/Open3D/resources";
-  app.Initialize(path.c_str());
   // testFindNearest();
   // exit(0);
-  testClosestOnTriangle();
+  // testClosestOnTriangle();
   // testAdjacencyList();
+  testExtrusion();
 }

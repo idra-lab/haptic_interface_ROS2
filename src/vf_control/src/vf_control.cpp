@@ -34,23 +34,46 @@ VFControl::VFControl(
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-    // auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-    open3d::data::KnotMesh dataset;
-    auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
-    o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
-    // dump mesh
-    open3d::io::WriteTriangleMesh(mesh_path_, *o3d_mesh);
-    RCLCPP_INFO(this->get_logger(), "Mesh Dumped");
-    AddMesh();
+    this->mesh_type_ = this->get_parameter("mesh_type").as_string();
+    this->input_mesh_path_ = this->get_parameter("input_mesh_path").as_string();
+    this->output_mesh_path_ = this->get_parameter("output_mesh_path").as_string();
+    this->skin_mesh_path_ = this->get_parameter("skin_mesh_path").as_string();
+    auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
 
-    rclcpp::sleep_for(1s); // idk why it is needed
-    RCLCPP_INFO_STREAM(this->get_logger(), "Loading mesh from file: " << mesh_path_);
-    if (!open3d::io::ReadTriangleMesh(mesh_path_, *o3d_mesh))
+    if (mesh_type_ == "bunny")
     {
-        std::cerr << "Failed to load mesh from file: " << mesh_path_ << std::endl;
+        open3d::data::BunnyMesh dataset;
+        o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
+    }
+    else if (mesh_type_ == "knot")
+    {
+        open3d::data::KnotMesh dataset;
+        o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
+        o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
+    }
+    else if (mesh_type_ == "sphere")
+    {
+        x_new_ << -0.09, -0.0024, 0.20140033;
+        vf_pose_ << -0.09, -0.0024, 0.20140033;
+        o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 20);
+    }
+    else if (mesh_type_ == "file")
+    {
+        // auto o3d_mesh_tmp = std::make_shared<open3d::geometry::TriangleMesh>();
+        // open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh_tmp);
+        // auto mesh_tmp = std::make_shared<Mesh>(o3d_mesh_tmp->vertices_, o3d_mesh_tmp->triangles_, o3d_mesh_tmp->triangle_normals_);
+        // mesh_tmp->extrudeMeshRadially(Eigen::Vector3d(0, 0, 0), 0.05);
+        // o3d_mesh->vertices_ = mesh_tmp->vertices;
+        // o3d_mesh->triangles_ = mesh_tmp->faces;
+        open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh);
+    }
+    else
+    {
+        std::cerr << "Invalid mesh type argument" << std::endl;
         rclcpp::shutdown();
     }
-
+    open3d::io::WriteTriangleMesh(output_mesh_path_, *o3d_mesh);
+    AddMesh();
     RCLCPP_INFO_STREAM(this->get_logger(), "Loaded mesh with " << o3d_mesh->vertices_.size()
                                                                << " vertices and " << o3d_mesh->triangles_.size() << " triangles.");
     // Ensure the mesh has vertices
@@ -62,10 +85,6 @@ VFControl::VFControl(
     o3d_mesh->ComputeTriangleNormals();
     o3d_mesh->OrientTriangles();
     o3d_mesh->NormalizeNormals();
-
-    // Convert vertices to a PointCloud
-    auto point_cloud = std::make_shared<open3d::geometry::PointCloud>();
-    point_cloud->points_ = o3d_mesh->vertices_;
 
     RCLCPP_INFO_STREAM(this->get_logger(), "Computing mesh properties...");
     mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->triangle_normals_);
@@ -184,6 +203,19 @@ void VFControl::impedanceThread()
     // tf_broadcaster_->sendTransform(target_pose_tf_);
     // target_pos_publisher_->publish(target_pose_);
 }
+void VFControl::ResetPlanes()
+{
+    visualization_msgs::msg::MarkerArray marker_array;
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = base_link_name_;
+    marker.header.stamp = get_clock()->now();
+    marker.ns = "constraint_planes";
+    marker.action = visualization_msgs::msg::Marker::DELETEALL;
+    marker_array.markers.push_back(marker);
+    marker_pub_->publish(marker_array);
+    constraint_planes_.clear();
+}
+
 void VFControl::AddMesh()
 {
     visualization_msgs::msg::MarkerArray marker_array;
@@ -193,11 +225,11 @@ void VFControl::AddMesh()
     marker.id = 0;
     marker.type = visualization_msgs::msg::Marker::MESH_RESOURCE;
     marker.action = visualization_msgs::msg::Marker::ADD;
-    marker.ns = "rib_cage";
+    marker.ns = "patient";
     marker.pose.position.x = 0.0;
     marker.pose.position.y = 0.0;
     marker.pose.position.z = 0.0;
-    marker.mesh_resource = "file://" + mesh_path_;
+    marker.mesh_resource = "file://" + output_mesh_path_;
     marker.mesh_use_embedded_materials = true;
     marker.scale.x = 1.0;
     marker.scale.y = 1.0;
@@ -207,13 +239,17 @@ void VFControl::AddMesh()
     marker.color.g = 1.0;
     marker.color.b = 1.0;
     marker.color.a = 1.0;
-    RCLCPP_INFO(this->get_logger(), "Rib cage mesh loaded");
+    marker_array.markers.push_back(marker);
+    marker.color.a = 0.2;
+    marker.mesh_resource = "file://" + skin_mesh_path_;
+    marker.id = 1;
     marker_array.markers.push_back(marker);
     for (int i = 0; i < 20; i++)
     {
         marker_pub_->publish(marker_array);
         rclcpp::sleep_for(100ms);
     }
+    RCLCPP_INFO(this->get_logger(), "Mesh visualization completed");
 }
 
 void VFControl::UpdateScene()
@@ -230,7 +266,6 @@ void VFControl::UpdateScene()
     visualization_msgs::msg::Marker marker;
     marker.header.frame_id = base_link_name_;
     marker.header.stamp = get_clock()->now();
-    // marker.ns = "virtual_fixture";
     marker.id = 1;
     marker.ns = "virtual_fixture";
     marker.type = visualization_msgs::msg::Marker::SPHERE;
@@ -238,15 +273,15 @@ void VFControl::UpdateScene()
     marker.pose.position.x = vf_pose_(0);
     marker.pose.position.y = vf_pose_(1);
     marker.pose.position.z = vf_pose_(2);
-    marker.scale.x = radius_;
-    marker.scale.y = radius_;
-    marker.scale.z = radius_;
+    marker.scale.x = radius_ * 2;
+    marker.scale.y = radius_ * 2;
+    marker.scale.z = radius_ * 2;
     marker.color.a = 1.0;
     marker.color.r = 0.0;
     marker.color.g = 1.0;
     marker.color.b = 0.0;
     marker_array.markers.push_back(marker);
-    // marker.ns = "target_pose";
+
     marker.ns = "target_pose";
     marker.id = 2;
     marker.pose.position.x = x_new_(0);
@@ -255,21 +290,21 @@ void VFControl::UpdateScene()
     marker.color.r = 1.0;
     marker.color.g = 0.0;
     marker_array.markers.push_back(marker);
-    // marker_pub_->publish(marker_array);
-    // Visualize plane constraints as collapsed boxes
-    visualization_msgs::msg::Marker delete_marker;
-    delete_marker.ns = "constraint_planes";
-    delete_marker.type = visualization_msgs::msg::Marker::DELETEALL;
-    // delete all previous markers
-    marker_array.markers.push_back(delete_marker);
+
+    marker.ns = "constraint_planes";
+    marker.action = visualization_msgs::msg::Marker::DELETEALL;
+    marker_array.markers.push_back(marker);
+    marker.action = visualization_msgs::msg::Marker::ADD;
     marker.type = visualization_msgs::msg::Marker::CUBE;
-    marker.scale.x = 0.04;
-    marker.scale.y = 0.04;
+    marker.scale.x = 0.01;
+    marker.scale.y = 0.01;
     marker.scale.z = 0.0001;
     marker.color.r = 1.0;
     marker.color.g = 1.0;
     marker.color.b = 0.0;
+    marker.color.a = 0.2;
     Eigen::Vector3d z_axis(0.0, 0.0, 1.0);
+    //   ResetPlanes();
     for (size_t i = 0; i < constraint_planes_.size(); i++)
     {
         auto n = constraint_planes_[i].first;

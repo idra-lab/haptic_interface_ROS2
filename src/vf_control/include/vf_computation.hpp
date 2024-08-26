@@ -21,7 +21,7 @@ Eigen::Vector3d enforce_virtual_fixture(
     // No nearby triangles found; return the target position
     return target_position - current_position;
   }
-  std::cout << "Nearby triangles: " << nearby_triangles.size() << std::endl;
+  // std::cout << "Nearby triangles: " << nearby_triangles.size() << std::endl;
 
   // Construct constraints based on nearby triangles
   constraint_planes.clear();
@@ -36,15 +36,23 @@ Eigen::Vector3d enforce_virtual_fixture(
   auto T = nearby_triangles;
 
   for (auto it = T.begin(); it != T.end();) {
-    std::cout <<"---------"<<std::endl;
+    // std::cout <<"---------"<<std::endl;
     int Ti = *it;
     auto [CPi, cpi_loc] = CP.at(Ti);
     Eigen::Vector3d Ni = mesh.normals[Ti];
+    auto face_center = (mesh.vertices[mesh.faces[Ti][0]] +
+                        mesh.vertices[mesh.faces[Ti][1]] +
+                        mesh.vertices[mesh.faces[Ti][2]]) /
+                       3;
+    if (Ni.dot(current_position - face_center) < 0) {
+      Ni = -Ni;
+    }
+    
     Ni.normalize();
-    std::cout << "face " << Ti << std::endl;
+    // std::cout << "face " << Ti << std::endl;
     if (cpi_loc == Location::IN) {
       if (Ni.dot(current_position - CPi) >= -eps) {
-        std::cout << "IN -> adding"<<std::endl;
+        // std::cout << "IN -> adding"<<std::endl;
         constraint_planes.emplace_back(Ni, CPi);
         ++it;  // Keep this triangle, move to the next
       } else {
@@ -54,7 +62,7 @@ Eigen::Vector3d enforce_virtual_fixture(
       continue;
     } else if (cpi_loc == Location::V1 || cpi_loc == Location::V2 ||
                cpi_loc == Location::V3) {
-      std::cout << "vertex"<<std::endl;
+      // std::cout << "vertex"<<std::endl;
       // Handle vertex case
       std::vector<int> neighborIdx1, neighborIdx2;
       if (cpi_loc == Location::V1) {
@@ -72,17 +80,17 @@ Eigen::Vector3d enforce_virtual_fixture(
       }
 
       bool keep = false;
-      std::cout << "neighbor1: " << neighborIdx1.size() << std::endl;
-      std::cout << "neighbor2: " << neighborIdx2.size() << std::endl;
+      // std::cout << "neighbor1: " << neighborIdx1.size() << std::endl;
+      // std::cout << "neighbor2: " << neighborIdx2.size() << std::endl;
       // Check both neighbor indices
       for (const auto &neighborIdx : {neighborIdx1, neighborIdx2}) {
         if (!neighborIdx.empty()) {
-          std::cout << "neighbor"<<std::endl;
+          // std::cout << "neighbor"<<std::endl;
           int neighbor = neighborIdx[0];
 
           // Ensure CP exists for the neighbor
           if (CP.find(neighbor) == CP.end()) {
-            std::cout << "CP not found -> computing"<<std::endl;
+            // std::cout << "CP not found -> computing"<<std::endl;
             CP[neighbor] =
                 mesh.get_closest_on_triangle(current_position, neighbor);
           }
@@ -103,12 +111,12 @@ Eigen::Vector3d enforce_virtual_fixture(
       }
 
       if (keep) {
-        std::cout << "adding vertex" << std::endl;
+        // std::cout << "adding vertex" << std::endl;
         Eigen::Vector3d n = (current_position - CPi).normalized();
         constraint_planes.emplace_back(n, CPi);
         ++it;  // Keep current triangle, move to the next
       } else {
-        std::cout << "removing vertex" << std::endl;
+        // std::cout << "removing vertex" << std::endl;
         CP.at(Ti).second = Location::VOID;
         T.erase(it);  // Remove current triangle
       }
@@ -158,13 +166,13 @@ Eigen::Vector3d enforce_virtual_fixture(
     }
 
     // If none of the above cases, remove the current triangle
-    std::cout <<"removing"<<std::endl;
+    // std::cout <<"removing"<<std::endl;
     CP.at(Ti).second = Location::VOID;
     T.erase(it);  // Remove current triangle
   }
 
   int n_constraints = constraint_planes.size();
-  std::cout << "Number of constraints: " << n_constraints << std::endl;
+  // std::cout << "Number of constraints: " << n_constraints << std::endl;
 
   // QP
   // solves argmin x^T H x + g^T x
@@ -198,7 +206,7 @@ Eigen::Vector3d enforce_virtual_fixture(
   int nWSR = 100;
   min_problem.init(H.data(), g.data(), A.data(), 0, 0, A_lb.data(), 0, nWSR);
   min_problem.getPrimalSolution(delta_x.data());
-  // std::cout << "delta_x: " << delta_x << std::endl;
+  // // std::cout << "delta_x: " << delta_x << std::endl;
   return delta_x.cast<double>();
 }
 #endif  // VF_COMPUTATION_HPP

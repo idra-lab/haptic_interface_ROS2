@@ -63,9 +63,6 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
   o3d_mesh->OrientTriangles();
   o3d_mesh->NormalizeNormals();
 
-  auto point_cloud = std::make_shared<open3d::geometry::PointCloud>();
-  point_cloud->points_ = o3d_mesh->vertices_;
-
   RCLCPP_INFO_STREAM(this->get_logger(), "Computing mesh properties...");
 
   mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_,
