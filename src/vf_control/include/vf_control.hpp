@@ -28,11 +28,11 @@
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/transform_broadcaster.h"
-#include "visualization_msgs/msg/marker_array.hpp"
 // my includes
 #include "closest_on_triangle.hpp"
 #include "mesh.hpp"
 #include "vf_computation.hpp"
+#include "visualization.hpp"
 #include <omp.h>
 
 class VFControl : public rclcpp::Node
@@ -57,9 +57,7 @@ public:
     void bag_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
     void call_impedance_service();
     void impedanceThread();
-    void AddMesh();
-    void UpdateScene();
-    void ResetPlanes();
+    void Initialize();
 
 private:
     // ROS2 subscribtions
@@ -82,14 +80,10 @@ private:
     // ROS2 timers
     rclcpp::TimerBase::SharedPtr pose_update_timer_;
     rclcpp::TimerBase::SharedPtr impedanceThread_;
-    rclcpp::TimerBase::SharedPtr visualizationThread_;
-
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
-        marker_pub_;
 
     // MESH
     std::shared_ptr<Mesh> mesh_;
-
+    // Visualizer visualizer_;  
     Eigen::Vector3d x_new_, vf_pose_;
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -98,7 +92,7 @@ private:
     // VARIABLES
     std::string base_link_name_ = "world";
     std::string input_mesh_path_, output_mesh_path_, skin_mesh_path_, mesh_type_;
-
+    std::shared_ptr<Visualizer> visualizer_;
     int client__id_;
     int ctr_;
     const double radius_ = 0.01;
