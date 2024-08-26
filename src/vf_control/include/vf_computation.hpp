@@ -1,6 +1,6 @@
 #ifndef VF_COMPUTATION_HPP
 #define VF_COMPUTATION_HPP
-
+#define DEBUG true
 #include "mesh.hpp"
 #include "qp_wrapper.hpp"
 
@@ -10,7 +10,7 @@ Eigen::Vector3d enforce_virtual_fixture(
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>
         &constraint_planes) {
   // Define a small buffer distance to prevent penetration
-  const double lookup_area = radius;
+  const double lookup_area = 2 * radius;
 
   // Find nearby triangles within a specified distance
   const double max_distance = radius + lookup_area;
@@ -35,177 +35,133 @@ Eigen::Vector3d enforce_virtual_fixture(
   }
   auto T = nearby_triangles;
 
-  for (size_t i = 0; i < T.size(); ++i) {
-    int Ti = T[i];
-
-    // Find the closest point on the triangle to the sphere center
-    auto [CPi, cpi_loc] = CP[Ti];
-
-    // Normalize the triangle normal
+  for (auto it = T.begin(); it != T.end();) {
+    std::cout <<"---------"<<std::endl;
+    int Ti = *it;
+    auto [CPi, cpi_loc] = CP.at(Ti);
     Eigen::Vector3d Ni = mesh.normals[Ti];
     Ni.normalize();
-
-    // Check if CPi is in the triangle and the normal points towards the sphere
-    // center
+    std::cout << "face " << Ti << std::endl;
     if (cpi_loc == Location::IN) {
-      if (Ni.transpose().dot(current_position - CPi) >= -eps) {
-        constraint_planes.push_back({Ni, CPi});
-        continue;
+      if (Ni.dot(current_position - CPi) >= -eps) {
+        std::cout << "IN -> adding"<<std::endl;
+        constraint_planes.emplace_back(Ni, CPi);
+        ++it;  // Keep this triangle, move to the next
+      } else {
+        CP.at(Ti).second = Location::VOID;
+        T.erase(it);  // Remove this triangle
       }
-    } else {
-      // Handle points on the edges or vertices
-      if (cpi_loc == Location::V1 || cpi_loc == Location::V2 ||
-          cpi_loc == Location::V3) {
-        Eigen::Vector3d n = Ni;
+      continue;
+    } else if (cpi_loc == Location::V1 || cpi_loc == Location::V2 ||
+               cpi_loc == Location::V3) {
+      std::cout << "vertex"<<std::endl;
+      // Handle vertex case
+      std::vector<int> neighborIdx1, neighborIdx2;
+      if (cpi_loc == Location::V1) {
+        neighborIdx1 = mesh.adjacency_dict.at({Ti, Location::V1V2});
+        neighborIdx2 = mesh.adjacency_dict.at({Ti, Location::V1V3});
+      } else if (cpi_loc == Location::V2) {
+        neighborIdx1 = mesh.adjacency_dict.at({Ti, Location::V1V2});
+        neighborIdx2 = mesh.adjacency_dict.at({Ti, Location::V2V3});
+      } else if (cpi_loc == Location::V3) {
+        neighborIdx1 = mesh.adjacency_dict.at({Ti, Location::V1V3});
+        neighborIdx2 = mesh.adjacency_dict.at({Ti, Location::V2V3});
+      } else {
+        std::cerr << "Error: location not on vertex" << std::endl;
+        exit(EXIT_FAILURE);
+      }
 
-        if ((current_position - CPi).norm() < eps) {
-          // Find all same vertex, average and remove
-          for (size_t j = i + 1; j < T.size(); ++j) {
-            int face = T[j];
-            auto [CPia, _] = CP[face];
+      bool keep = false;
+      std::cout << "neighbor1: " << neighborIdx1.size() << std::endl;
+      std::cout << "neighbor2: " << neighborIdx2.size() << std::endl;
+      // Check both neighbor indices
+      for (const auto &neighborIdx : {neighborIdx1, neighborIdx2}) {
+        if (!neighborIdx.empty()) {
+          std::cout << "neighbor"<<std::endl;
+          int neighbor = neighborIdx[0];
 
-            if ((CPia - CPi).norm() < eps) {
-              n += mesh.normals[face].normalized();
-              auto it = std::find(T.begin(), T.end(), face);
-              if (it != T.end()) T.erase(it);
-              --j;  // Adjust index after deletion
+          // Ensure CP exists for the neighbor
+          if (CP.find(neighbor) == CP.end()) {
+            std::cout << "CP not found -> computing"<<std::endl;
+            CP[neighbor] =
+                mesh.get_closest_on_triangle(current_position, neighbor);
+          }
+          auto [CPia, _] = CP.at(neighbor);
+          if ((CPia - CPi).norm() < eps) {
+            for (auto face_it = it + 1; face_it != T.end();) {
+              if (*face_it == neighbor) {
+                T.erase(face_it);  // Remove neighbor triangle
+                CP.at(neighbor).second = Location::VOID;
+                keep = true;
+                break;
+              } else {
+                ++face_it;
+              }
+            }
+          }
+        }
+      }
+
+      if (keep) {
+        std::cout << "adding vertex" << std::endl;
+        Eigen::Vector3d n = (current_position - CPi).normalized();
+        constraint_planes.emplace_back(n, CPi);
+        ++it;  // Keep current triangle, move to the next
+      } else {
+        std::cout << "removing vertex" << std::endl;
+        CP.at(Ti).second = Location::VOID;
+        T.erase(it);  // Remove current triangle
+      }
+      continue;
+    } 
+    else if (cpi_loc != Location::VOID) {
+      // Handle edge case
+      std::vector<int> neighborIdx = mesh.adjacency_dict.at({Ti, cpi_loc});
+      if (!neighborIdx.empty()) {
+        int neighborIdx0 = neighborIdx[0];
+
+        if (CP.find(neighborIdx0) == CP.end()) {
+          CP[neighborIdx0] =
+              mesh.get_closest_on_triangle(current_position, neighborIdx0);
+        }
+
+        auto [CPia, cpia_loc] = CP.at(neighborIdx0);
+
+        if (mesh.is_locally_concave(Ti, neighborIdx0, cpi_loc) &&
+            (CPi - CPia).norm() < eps) {
+          CP.at(neighborIdx0).second = Location::VOID;
+          for (auto face_it = it + 1; face_it != T.end();) {
+            if (*face_it == neighborIdx0) {
+              T.erase(face_it);  // Remove neighbor triangle
+              break;
+            } else {
+              ++face_it;
             }
           }
 
-          // Normalize normal
-          n.normalize();
-          constraint_planes.push_back({n, CPi});
-          
-          continue;
+          Eigen::Vector3d n = (current_position - CPi).normalized();
+          constraint_planes.emplace_back(n, CPi);
+          ++it;  // Keep current triangle, move to the next
+        } else if (cpia_loc != Location::VOID &&
+                   Ni.dot(current_position - CPi) >= -eps) {
+          constraint_planes.emplace_back(Ni, CPi);
+          ++it;  // Keep current triangle, move to the next
         } else {
-          std::vector<int> neighborIdx1, neighborIdx2;
-
-          if (cpi_loc == Location::V1) {
-            neighborIdx1 = mesh.adjacency_dict.at({Ti, Location::V1V2});
-            neighborIdx2 = mesh.adjacency_dict.at({Ti, Location::V1V3});
-          } else if (cpi_loc == Location::V2) {
-            neighborIdx1 = mesh.adjacency_dict.at({Ti, Location::V1V2});
-            neighborIdx2 = mesh.adjacency_dict.at({Ti, Location::V2V3});
-          } else if (cpi_loc == Location::V3) {
-            neighborIdx1 = mesh.adjacency_dict.at({Ti, Location::V1V3});
-            neighborIdx2 = mesh.adjacency_dict.at({Ti, Location::V2V3});
-          } else {
-            std::cerr << "Error: location not on vertex" << std::endl;
-            exit(EXIT_FAILURE);
-          }
-
-          bool keep = false;
-
-          if (neighborIdx1.size() > 0) {
-            int neighborIdx = neighborIdx1[0];
-            bool is_in_cp_list = true;
-            auto CPia_iter = CP.find(neighborIdx);
-            Eigen::Vector3d CPia;
-
-            if (CPia_iter != CP.end()) {
-              CPia = CPia_iter->second.first;
-            } else {
-              is_in_cp_list = false;
-              std::tie(CPia, std::ignore) =
-                  mesh.get_closest_on_triangle(current_position, neighborIdx);
-            }
-
-            if ((CPia - CPi).norm() < eps) {
-              auto it = std::find(T.begin(), T.end(), neighborIdx);
-              if (it != T.end()) T.erase(it);
-              if (is_in_cp_list) CP[neighborIdx].second = Location::VOID;
-              keep = true;
-            }
-          }
-
-          if (!neighborIdx2.size() > 0) {
-            int neighborIdx = neighborIdx2[0];
-            bool is_in_cp_list = true;
-            auto CPia_iter = CP.find(neighborIdx);
-            Eigen::Vector3d CPia;
-
-            if (CPia_iter != CP.end()) {
-              CPia = CPia_iter->second.first;
-            } else {
-              is_in_cp_list = false;
-              std::tie(CPia, std::ignore) =
-                  mesh.get_closest_on_triangle(current_position, neighborIdx);
-            }
-
-            if ((CPia - CPi).norm() < eps) {
-              auto it = std::find(T.begin(), T.end(), neighborIdx);
-              if (it != T.end()) T.erase(it);
-              if (is_in_cp_list) CP[neighborIdx].second = Location::VOID;
-              keep = true;
-            }
-          }
-
-          if (keep) {
-            Eigen::Vector3d n = current_position - CPi;
-            n.normalize();
-            constraint_planes.push_back({n, CPi});
-            
-            continue;
-          }
+          CP.at(Ti).second = Location::VOID;
+          T.erase(it);  // Remove current triangle
         }
       } else {
-        if (cpi_loc != Location::VOID) {
-          auto neighborIdxs = mesh.adjacency_dict.at({Ti, cpi_loc});
-
-          if (neighborIdxs.size() > 0) {
-            int neighborIdx = neighborIdxs[0];
-            bool is_in_cp_list = true;
-            auto CPia_iter = CP.find(neighborIdx);
-            Eigen::Vector3d CPia;
-
-            if (CPia_iter != CP.end()) {
-              CPia = CPia_iter->second.first;
-            } else {
-              is_in_cp_list = false;
-              std::tie(CPia, std::ignore) =
-                  mesh.get_closest_on_triangle(current_position, neighborIdx);
-            }
-
-            if (mesh.is_locally_concave(Ti, neighborIdx, cpi_loc)) {
-              if ((CPi - CPia).norm() < eps) {
-                if ((current_position - CPi).norm() < eps) {
-                  Eigen::Vector3d n = Ni + mesh.normals[neighborIdx].normalized();
-                    n.normalize();
-                  constraint_planes.push_back({n, CPi});
-                  
-                  continue;
-                } else {
-                  if (is_in_cp_list) CP[neighborIdx].second = Location::VOID;
-
-                  auto it = std::find(T.begin(), T.end(), neighborIdx);
-                  if (it != T.end()) T.erase(it);
-
-                  Eigen::Vector3d n = current_position - CPi;
-                  n.normalize();
-                  constraint_planes.push_back({n, CPi});
-                  
-                  continue;
-                }
-              }
-            } else if (cpi_loc != Location::VOID &&
-                       Ni.transpose().dot(current_position - CPi) >= -eps) {
-              constraint_planes.push_back({Ni, CPi});
-              
-              continue;
-            }
-          } else {
-            continue;
-          }
-        }
+        CP.at(Ti).second = Location::VOID;
+        T.erase(it);  // Remove current triangle
       }
+      continue;
     }
 
-    // otherwise, delete current mesh
-    CP[Ti].second = Location::VOID;
-    auto it = std::find(T.begin(), T.end(), Ti);
-    if (it != T.end()) T.erase(it);
+    // If none of the above cases, remove the current triangle
+    std::cout <<"removing"<<std::endl;
+    CP.at(Ti).second = Location::VOID;
+    T.erase(it);  // Remove current triangle
   }
-  int iteration = 0;
 
   int n_constraints = constraint_planes.size();
   std::cout << "Number of constraints: " << n_constraints << std::endl;
@@ -229,7 +185,7 @@ Eigen::Vector3d enforce_virtual_fixture(
   for (int i = 0; i < n_constraints; ++i) {
     const Eigen::Vector3d n = constraint_planes[i].first;
     const Eigen::Vector3d p = constraint_planes[i].second;
-    A_lb(i) = -n.transpose() * (current_position - p);
+    A_lb(i) = -n.transpose() * (current_position - p) + radius;
     A(i, 0) = n[0];
     A(i, 1) = n[1];
     A(i, 2) = n[2];

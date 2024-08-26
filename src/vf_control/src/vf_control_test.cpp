@@ -20,18 +20,21 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
   marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
       "visualization_marker", 1);
 
-  x_new_ << 0.0, 0.0, 0.3;
-  vf_pose_ << 0.0, 0.0, 0.3;
+  x_new_ << -0.09, -0.0024, 0.20140033;
+  vf_pose_ << -0.09, -0.0024, 0.20140033;
+
+  // x_new_ << -0.0, 0.0, 0.2;
+  // vf_pose_ << -0.0, 0.0, 0.2;
 
   // Initializes the TF2 transform listener and buffer
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-  // open3d::data::KnotMesh dataset;
+  open3d::data::KnotMesh dataset;
   // auto o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
   // o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
-  auto o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2,40);
+  auto o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 40);
   open3d::io::WriteTriangleMesh(load_path_, *o3d_mesh);
 
   RCLCPP_INFO_STREAM(this->get_logger(),
@@ -58,12 +61,15 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
   visualizationThread_ =
       this->create_wall_timer(10ms, std::bind(&VFControl::UpdateScene, this));
 
+  Eigen::Vector3d delta_x = enforce_virtual_fixture(
+      *mesh_, x_new_, vf_pose_, radius_, constraint_planes_);
+  vf_pose_ += 0.9 * delta_x;
   // Start the keyboard input thread
   std::thread input_thread(&VFControl::KeyboardInputLoop, this);
   input_thread.detach();
 
-  RCLCPP_INFO(this->get_logger(),
-              "\033[0;32mVisualization thread started\033[0m");
+  // RCLCPP_INFO(this->get_logger(),
+  //             "\033[0;32mVisualization thread started\033[0m");
 }
 
 // Function to handle keyboard input
@@ -190,8 +196,8 @@ void VFControl::UpdateScene() {
 
   marker.ns = "constraint_planes";
   marker.type = visualization_msgs::msg::Marker::CUBE;
-  marker.scale.x = 0.03;
-  marker.scale.y = 0.03;
+  marker.scale.x = 0.07;
+  marker.scale.y = 0.07;
   marker.scale.z = 0.0001;
   marker.color.r = 1.0;
   marker.color.g = 1.0;
