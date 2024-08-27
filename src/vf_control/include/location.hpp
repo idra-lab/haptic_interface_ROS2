@@ -11,7 +11,7 @@ enum class Location
     V1V3 = 5,
     V2V3 = 6
 };
-inline const char * LocationToString(Location l)
+const inline char * LocationToString(Location l)
 {
     switch (l)
     {

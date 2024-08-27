@@ -95,7 +95,7 @@ private:
     std::shared_ptr<Visualizer> visualizer_;
     int client__id_;
     int ctr_;
-    const double radius_ = 0.01;
+    double radius_, lookup_area_;
 };
 
 #endif // VF_CONTROL_HPP

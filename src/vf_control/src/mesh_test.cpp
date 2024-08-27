@@ -148,7 +148,7 @@ void colorMeshFacesNew(open3d::t::geometry::TriangleMesh &mesh_new, int faceIdx,
   colors[faceIdx][1] = 0;
   colors[faceIdx][2] = 0;
 
-  for (int i = 0; i < adjacent_faces.size(); i++) {
+  for (size_t i = 0; i < adjacent_faces.size(); i++) {
     colors[adjacent_faces[i]][0] = 0;
     colors[adjacent_faces[i]][1] = 1;
     colors[adjacent_faces[i]][2] = 0;
@@ -168,7 +168,7 @@ void colorVertices(open3d::geometry::TriangleMesh &mesh, int faceIdx,
   colors[v2][1] = 0;
   colors[v3][2] = 0;
 
-  for (int i = 0; i < adjacent_faces.size(); i++) {
+  for (size_t i = 0; i < adjacent_faces.size(); i++) {
     v1 = faces[adjacent_faces[i]][0];
     v2 = faces[adjacent_faces[i]][1];
     v3 = faces[adjacent_faces[i]][2];
@@ -248,7 +248,7 @@ void testExtrusion(){
 
 
 }
-int main(int argc, char **argv) {
+int main() {
   // testFindNearest();
   // exit(0);
   // testClosestOnTriangle();

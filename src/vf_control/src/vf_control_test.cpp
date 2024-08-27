@@ -12,7 +12,8 @@ using std::placeholders::_1;
 
 VFControl::VFControl(const std::string &name, const std::string &namespace_,
                      const rclcpp::NodeOptions &options)
-    : Node(name, namespace_, options) {
+    : Node(name, namespace_, options)
+{
   target_pos_publisher_ =
       this->create_publisher<geometry_msgs::msg::PoseStamped>("target_frame_vf",
                                                               1);
@@ -20,40 +21,64 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
   this->mesh_type_ = this->get_parameter("mesh_type").as_string();
   this->input_mesh_path_ = this->get_parameter("input_mesh_path").as_string();
   this->output_mesh_path_ = this->get_parameter("output_mesh_path").as_string();
+  this->radius_ = this->get_parameter("radius").as_double();
+  this->lookup_area_ = this->get_parameter("lookup_area").as_double();
 
   // Initializes the TF2 transform listener and buffer
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 }
-void VFControl::Initialize() {
+void VFControl::Initialize()
+{
   x_new_ << -0.0, 0.0, 0.2;
   vf_pose_ << -0.0, 0.0, 0.2;
+
   auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-  if (mesh_type_ == "bunny") {
+  visualizer_ = std::make_shared<Visualizer>(this->shared_from_this(), base_link_name_);
+
+  if (mesh_type_ == "bunny")
+  {
     open3d::data::BunnyMesh dataset;
     o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
-  } else if (mesh_type_ == "knot") {
+  }
+  else if (mesh_type_ == "knot")
+  {
     open3d::data::KnotMesh dataset;
     o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
     o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
-  } else if (mesh_type_ == "sphere") {
+  }
+  else if (mesh_type_ == "sphere")
+  {
     x_new_ << -0.09, -0.0024, 0.20140033;
     vf_pose_ << -0.09, -0.0024, 0.20140033;
     o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 20);
-  } else if (mesh_type_ == "file") {
+  }
+  else if (mesh_type_ == "file")
+  {
     open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh);
-  } else {
+  }
+  else
+  {
     std::cerr << "Invalid mesh type argument" << std::endl;
     rclcpp::shutdown();
   }
   open3d::io::WriteTriangleMesh(output_mesh_path_, *o3d_mesh);
+  if (mesh_type_ == "file")
+  {
+    visualizer_->AddPatientMesh(output_mesh_path_, skin_mesh_path_);
+  }
+  else
+  {
+    visualizer_->AddMesh(output_mesh_path_, 0);
+  }
   // skin mesh path ignored if not file
   RCLCPP_INFO_STREAM(this->get_logger(),
                      "Loaded mesh with "
                          << o3d_mesh->vertices_.size() << " vertices and "
                          << o3d_mesh->triangles_.size() << " triangles.");
-  if (o3d_mesh->vertices_.empty()) {
+  if (o3d_mesh->vertices_.empty())
+  {
     std::cerr << "The loaded mesh contains no vertices." << std::endl;
     rclcpp::shutdown();
   }
@@ -65,10 +90,10 @@ void VFControl::Initialize() {
 
   mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_,
                                  o3d_mesh->triangle_normals_);
-  rclcpp::sleep_for(1s);  // idk why it is needed
+  rclcpp::sleep_for(1s); // idk why it is needed
 
   Eigen::Vector3d delta_x = enforce_virtual_fixture(
-      *mesh_, x_new_, vf_pose_, radius_, constraint_planes_);
+      *mesh_, x_new_, vf_pose_, radius_, constraint_planes_, lookup_area_);
   vf_pose_ += 0.9 * delta_x;
 
   visualizer_ =
@@ -83,7 +108,8 @@ void VFControl::Initialize() {
 }
 
 // Function to handle keyboard input
-void VFControl::KeyboardInputLoop() {
+void VFControl::KeyboardInputLoop()
+{
   char c;
   struct termios oldt;
   struct termios newt;
@@ -102,19 +128,26 @@ void VFControl::KeyboardInputLoop() {
   tcsetattr(fileno(stdin), TCSANOW, &newt);
 
   Eigen::Vector3d direction(0, 0, 0);
-  while (rclcpp::ok()) {
+  while (rclcpp::ok())
+  {
     c = getchar();
 
     // WASD + Arrow keys control
-    if (c == 'w') direction(1) += 1;
-    if (c == 's') direction(1) -= 1;
-    if (c == 'a') direction(0) -= 1;
-    if (c == 'd') direction(0) += 1;
-    if (c == 'q') direction(2) += 1;
-    if (c == 'e') direction(2) -= 1;
+    if (c == 'w')
+      direction(1) += 1;
+    if (c == 's')
+      direction(1) -= 1;
+    if (c == 'a')
+      direction(0) -= 1;
+    if (c == 'd')
+      direction(0) += 1;
+    if (c == 'q')
+      direction(2) += 1;
+    if (c == 'e')
+      direction(2) -= 1;
     x_new_ = x_new_ + direction * 0.003;
     Eigen::Vector3d delta_x = enforce_virtual_fixture(
-        *mesh_, x_new_, vf_pose_, radius_, constraint_planes_);
+        *mesh_, x_new_, vf_pose_, radius_, constraint_planes_, lookup_area_);
     visualizer_->UpdateScene(constraint_planes_, x_new_, vf_pose_, radius_);
     vf_pose_ += 0.9 * delta_x;
     direction << 0.0, 0.0, 0.0;
@@ -123,7 +156,8 @@ void VFControl::KeyboardInputLoop() {
   // Restore the old settings
   tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting VF Control node");
 
   rclcpp::init(argc, argv);

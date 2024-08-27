@@ -35,9 +35,13 @@ VFControl::VFControl(
     this->input_mesh_path_ = this->get_parameter("input_mesh_path").as_string();
     this->output_mesh_path_ = this->get_parameter("output_mesh_path").as_string();
     this->skin_mesh_path_ = this->get_parameter("skin_mesh_path").as_string();
+    this->radius_ = this->get_parameter("radius").as_double();
+    this->lookup_area_ = this->get_parameter("lookup_area").as_double();
 }
-void VFControl::Initialize(){
+void VFControl::Initialize()
+{
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
+    visualizer_ = std::make_shared<Visualizer>(this->shared_from_this(), base_link_name_);
 
     if (mesh_type_ == "bunny")
     {
@@ -71,9 +75,13 @@ void VFControl::Initialize(){
         std::cerr << "Invalid mesh type argument" << std::endl;
         rclcpp::shutdown();
     }
-    visualizer_ = std::make_shared<Visualizer>(this->shared_from_this(), base_link_name_);
-    visualizer_->AddPatientMesh(output_mesh_path_, skin_mesh_path_);
     open3d::io::WriteTriangleMesh(output_mesh_path_, *o3d_mesh);
+    if (mesh_type_ == "file")
+    {
+        visualizer_->AddPatientMesh(output_mesh_path_, skin_mesh_path_);
+    }else{
+        visualizer_->AddMesh(output_mesh_path_, 0);
+    }
     RCLCPP_INFO_STREAM(this->get_logger(), "Loaded mesh with " << o3d_mesh->vertices_.size()
                                                                << " vertices and " << o3d_mesh->triangles_.size() << " triangles.");
     // Ensure the mesh has vertices
@@ -95,7 +103,7 @@ void VFControl::out_virtuose_pose_CB(
     x_new_ << msg->virtuose_pose.translation.x, msg->virtuose_pose.translation.y,
         msg->virtuose_pose.translation.z;
 
-    Eigen::Vector3d delta_x = enforce_virtual_fixture(*mesh_, x_new_, vf_pose_, radius_, constraint_planes_);
+    Eigen::Vector3d delta_x = enforce_virtual_fixture(*mesh_, x_new_, vf_pose_, radius_, constraint_planes_, lookup_area_);
     vf_pose_ += 0.9 * delta_x;
     visualizer_->UpdateScene(constraint_planes_, x_new_, vf_pose_, radius_);
 }
@@ -167,11 +175,11 @@ void VFControl::call_impedance_service()
     // impedanceThread_ = this->create_wall_timer(
     //     1ms, std::bind(&VFControl::impedanceThread, this));
     rclcpp::sleep_for(1s); // idk why it is needed
-
 }
 void VFControl::out_virtuose_statusCB(
     const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg)
 {
+    (void)msg;
     // Store last status date
     // auto status_date_nanosec_ = msg->header.stamp.nanosec;
     // auto status_date_sec_ = msg->header.stamp.sec;
@@ -201,7 +209,6 @@ void VFControl::impedanceThread()
     // tf_broadcaster_->sendTransform(target_pose_tf_);
     // target_pos_publisher_->publish(target_pose_);
 }
-
 
 int main(int argc, char **argv)
 {

@@ -1,10 +1,14 @@
 vf_control:
   ros__parameters:
+    # haptic device params
     channel: "SimpleChannelUDP"
     ff_device_ip_address: "192.168.100.53"
     ff_device_param_file: "/etc/Haption/Connector/desktop_6D_n65.param"
     local_ip_address: "192.168.100.50"
-    mesh_type: "file" # knot, sphere, file 
-    input_mesh_path: "/home/hydran00/SKEL_WS/ros2_ws/projected_skel.obj"
-    skin_mesh_path: "/home/hydran00/SKEL_WS/ros2_ws/skin_mesh.obj"
-    output_mesh_path : "/home/hydran00/SKEL_WS/ros2_ws/output_model.obj"
+    # vf params
+    mesh_type: "file" # knot, sphere, file, bunny 
+    input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/projected_skel.obj"
+    skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj"
+    output_mesh_path : "/home/nardi/SKEL_WS/ros2_ws/output_model.obj"
+    radius: 0.002
+    lookup_area: 0.005 # should be at least 2*radius

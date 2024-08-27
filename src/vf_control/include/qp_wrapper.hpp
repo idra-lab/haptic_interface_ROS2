@@ -1,5 +1,9 @@
 #ifndef QPROS2_QPOASES_EIGEN_WRAPPER_HPP
 #define QPROS2_QPOASES_EIGEN_WRAPPER_HPP
+#ifdef __GNUC__
+// Avoid warnings
+#pragma GCC system_header
+#endif
 #include <Eigen/Dense>
 #include "qpOASES/MessageHandling.hpp"
 #include "qpOASES/SQProblem.hpp"

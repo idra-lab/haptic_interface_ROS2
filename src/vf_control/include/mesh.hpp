@@ -27,6 +27,7 @@ struct hash_tuple
     return h1 ^ h2;
   }
 };
+
 class Mesh
 {
 public:
@@ -94,16 +95,17 @@ public:
   }
   void extrudeMeshRadially(const Eigen::Vector3d& origin, const double scale)
   {
+    (void)origin;
     // find the faces with no neighbors
     std::vector<int> border_faces;
 
     // #pragma omp parallel for
     const int num_faces = faces.size();
-    for (size_t i = 0; i < num_faces; ++i)
+    for (size_t i = 0; (int)i < num_faces; ++i)
     {
-      Eigen::Vector3d face_center = (vertices[faces[i][0]] + vertices[faces[i][1]] + vertices[faces[i][2]]) / 3;
+      // const Eigen::Vector3d face_center = (vertices[faces[i][0]] + vertices[faces[i][1]] + vertices[faces[i][2]]) / 3;
       // Eigen::Vector3d direction = (origin - face_center).normalized();
-      Eigen::Vector3d direction(0,0,-1);
+      const Eigen::Vector3d direction(0,0,-1);
 
       if (adjacency_dict.at({i, Location::V1V2}).size() == 0)
       {
@@ -132,7 +134,7 @@ public:
     // add the new vertex
     vertices.push_back(extruded_v3);
     // add the new face
-    faces.push_back({v1, v2, vertices.size() - 1});
+    faces.push_back({v1, v2, (int)vertices.size() - 1});
   }
 
   Eigen::Matrix4d compute_triangle_xfm(int idx)
