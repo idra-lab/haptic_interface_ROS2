@@ -48,14 +48,13 @@ public:
     precompute_adjacency();
   }
   std::vector<int> find_nearby_triangles(const Eigen::Vector3d &position,
-                                         double max_distance)
+                                         double max_distance, std::vector<int> &nearby_triangles)
   {
-    std::vector<int> indices;
     std::vector<double> distances;
+    std::vector<int> indices;
     kdtree.SearchRadius(position, max_distance, indices, distances);
 
     std::unordered_set<int> index_set(indices.begin(), indices.end());
-    std::vector<int> nearby_triangles;
 
     for (size_t i = 0; i < faces.size(); ++i)
     {

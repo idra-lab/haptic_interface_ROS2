@@ -3,6 +3,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include "location.hpp"
 
 using namespace std::chrono_literals;
 class Visualizer
@@ -12,8 +13,10 @@ public:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
       marker_pub_;
   std::string reference_frame_;
+  double plane_size_;
 
-  void InitMeshMsg(visualization_msgs::msg::Marker &marker){
+  void InitMsg(visualization_msgs::msg::Marker &marker)
+  {
     marker.header.frame_id = reference_frame_;
     marker.header.stamp = node_->now();
     marker.id = 0;
@@ -36,11 +39,11 @@ public:
   {
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
-    InitMeshMsg(marker);
+    InitMsg(marker);
     marker.id = id;
     marker.ns = "mesh";
     marker.mesh_resource = "file://" + path;
-    marker.color.a = 0.8;
+    marker.color.a = 1.0;
     marker_array.markers.push_back(marker);
     for (int i = 0; i < 20; i++)
     {
@@ -53,7 +56,7 @@ public:
   {
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
-    InitMeshMsg(marker);
+    InitMsg(marker);
     marker.id = 0;
     marker.ns = "patient";
     marker.mesh_resource = "file://" + output_mesh_path;
@@ -68,6 +71,51 @@ public:
       rclcpp::sleep_for(100ms);
     }
     RCLCPP_INFO(node_->get_logger(), "Mesh visualization completed");
+  }
+  void DrawClosestPoints(std::unordered_map<int, std::pair<Eigen::Vector3d, Location>> &points, double radius)
+  {
+    visualization_msgs::msg::MarkerArray marker_array;
+    visualization_msgs::msg::Marker marker;
+    InitMsg(marker);
+    marker.ns = "CP";
+    marker.action = visualization_msgs::msg::Marker::DELETEALL;
+    marker_array.markers.push_back(marker);
+    marker.type = visualization_msgs::msg::Marker::SPHERE;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.color.a = 1.0;
+    marker.scale.x = radius;
+    marker.scale.y = radius;
+    marker.scale.z = radius;
+    // iterating over the map
+    int it = 0;
+    for (auto [i, point] : points)
+    {
+      marker.id = it++;
+      if (point.second == Location::IN)
+      {
+        marker.color.r = 1.0;
+        marker.color.g = 0.0;
+        marker.color.b = 0.0;
+      }
+      else if (point.second == Location::V1 || point.second == Location::V2 || point.second == Location::V3)
+      {
+        marker.color.r = 0.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+      }
+      else
+      {
+        // on edge
+        marker.color.r = 0.0;
+        marker.color.g = 0.0;
+        marker.color.b = 1.0;
+      }
+      marker.pose.position.x = point.first(0);
+      marker.pose.position.y = point.first(1);
+      marker.pose.position.z = point.first(2);
+      marker_array.markers.push_back(marker);
+    }
+    marker_pub_->publish(marker_array);
   }
 
   void UpdateScene(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>
@@ -90,7 +138,7 @@ public:
     marker.scale.x = radius * 2;
     marker.scale.y = radius * 2;
     marker.scale.z = radius * 2;
-    marker.color.a = 1.0;
+    marker.color.a = 0.5;
     marker.color.r = 0.0;
     marker.color.g = 1.0;
     marker.color.b = 0.0;
@@ -111,13 +159,13 @@ public:
     marker_array.markers.push_back(marker);
     marker.action = visualization_msgs::msg::Marker::ADD;
     marker.type = visualization_msgs::msg::Marker::CUBE;
-    marker.scale.x = 0.01;
-    marker.scale.y = 0.01;
+    marker.scale.x = plane_size_;
+    marker.scale.y = plane_size_;
     marker.scale.z = 0.0001;
     marker.color.r = 1.0;
     marker.color.g = 1.0;
     marker.color.b = 0.0;
-    marker.color.a = 0.6;
+    marker.color.a = 1.0;
     Eigen::Vector3d z_axis(0.0, 0.0, 1.0);
     for (size_t i = 0; i < constraint_planes.size(); i++)
     {
@@ -140,8 +188,8 @@ public:
     }
     marker_pub_->publish(marker_array);
   }
-  Visualizer(std::shared_ptr<rclcpp::Node> node, std::string reference_frame)
-      : node_(node), reference_frame_(reference_frame)
+  Visualizer(std::shared_ptr<rclcpp::Node> node, std::string reference_frame, double plane_size)
+      : node_(node), reference_frame_(reference_frame), plane_size_(plane_size)
   {
     marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
         "visualization_marker", 1);

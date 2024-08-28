@@ -37,11 +37,12 @@ VFControl::VFControl(
     this->skin_mesh_path_ = this->get_parameter("skin_mesh_path").as_string();
     this->radius_ = this->get_parameter("radius").as_double();
     this->lookup_area_ = this->get_parameter("lookup_area").as_double();
+    this->plane_size_ = this->get_parameter("plane_size").as_double();
 }
 void VFControl::Initialize()
 {
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-    visualizer_ = std::make_shared<Visualizer>(this->shared_from_this(), base_link_name_);
+    visualizer_ = std::make_shared<Visualizer>(this->shared_from_this(), base_link_name_, plane_size_);
 
     if (mesh_type_ == "bunny")
     {
@@ -50,6 +51,8 @@ void VFControl::Initialize()
     }
     else if (mesh_type_ == "knot")
     {
+        x_new_ << -0.09, -0.0024, 0.20140033;
+        vf_pose_ << -0.09, -0.0024, 0.20140033;
         open3d::data::KnotMesh dataset;
         o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
         o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
@@ -79,7 +82,9 @@ void VFControl::Initialize()
     if (mesh_type_ == "file")
     {
         visualizer_->AddPatientMesh(output_mesh_path_, skin_mesh_path_);
-    }else{
+    }
+    else
+    {
         visualizer_->AddMesh(output_mesh_path_, 0);
     }
     RCLCPP_INFO_STREAM(this->get_logger(), "Loaded mesh with " << o3d_mesh->vertices_.size()
@@ -94,6 +99,23 @@ void VFControl::Initialize()
     o3d_mesh->OrientTriangles();
     o3d_mesh->NormalizeNormals();
 
+    if (mesh_type_ == "file")
+    {   
+        // make normals point outwards
+        for (size_t i = 0; i < o3d_mesh->triangles_.size(); i++)
+        {
+            auto face = o3d_mesh->triangles_[i];
+            int v0 = face[0];
+            int v1 = face[1];
+            int v2 = face[2];
+            auto triangle_center = (o3d_mesh->vertices_[v0] + o3d_mesh->vertices_[v1] + o3d_mesh->vertices_[v2]) / 3;
+            auto direction = (triangle_center - o3d_mesh->GetCenter()).normalized();
+            if (o3d_mesh->triangle_normals_[i].dot(direction) < 0)
+            {
+                o3d_mesh->triangle_normals_[i] *= -1;
+            }
+        }
+    }
     RCLCPP_INFO_STREAM(this->get_logger(), "Computing mesh properties...");
     mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->triangle_normals_);
 }
@@ -103,7 +125,7 @@ void VFControl::out_virtuose_pose_CB(
     x_new_ << msg->virtuose_pose.translation.x, msg->virtuose_pose.translation.y,
         msg->virtuose_pose.translation.z;
 
-    Eigen::Vector3d delta_x = enforce_virtual_fixture(*mesh_, x_new_, vf_pose_, radius_, constraint_planes_, lookup_area_);
+    Eigen::Vector3d delta_x = enforce_virtual_fixture(*mesh_, x_new_, vf_pose_, radius_, constraint_planes_, lookup_area_, *visualizer_);
     vf_pose_ += 0.9 * delta_x;
     visualizer_->UpdateScene(constraint_planes_, x_new_, vf_pose_, radius_);
 }
@@ -123,9 +145,9 @@ void VFControl::call_impedance_service()
     this->get_parameter("ff_device_param_file", imp->ff_device_param_file);
     this->get_parameter("local_ip_address", imp->local_ip_address);
 
-    imp->base_frame.translation.x = 0.0;
-    imp->base_frame.translation.y = 0.0;
-    imp->base_frame.translation.z = 0.0;
+    imp->base_frame.translation.x = x_new_(0);
+    imp->base_frame.translation.y = x_new_(1);
+    imp->base_frame.translation.z = x_new_(2);
 
     imp->base_frame.rotation.x = 0.0;
     imp->base_frame.rotation.y = 0.0;

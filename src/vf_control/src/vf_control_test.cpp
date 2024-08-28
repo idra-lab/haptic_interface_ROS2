@@ -23,6 +23,7 @@ VFControl::VFControl(const std::string &name, const std::string &namespace_,
   this->output_mesh_path_ = this->get_parameter("output_mesh_path").as_string();
   this->radius_ = this->get_parameter("radius").as_double();
   this->lookup_area_ = this->get_parameter("lookup_area").as_double();
+  this->plane_size_ = this->get_parameter("plane_size").as_double();
 
   // Initializes the TF2 transform listener and buffer
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
@@ -35,7 +36,7 @@ void VFControl::Initialize()
   vf_pose_ << -0.0, 0.0, 0.2;
 
   auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-  visualizer_ = std::make_shared<Visualizer>(this->shared_from_this(), base_link_name_);
+  visualizer_ = std::make_shared<Visualizer>(this->shared_from_this(), base_link_name_, plane_size_);
 
   if (mesh_type_ == "bunny")
   {
@@ -88,16 +89,28 @@ void VFControl::Initialize()
 
   RCLCPP_INFO_STREAM(this->get_logger(), "Computing mesh properties...");
 
+  if(mesh_type_ == "file"){
+    for(size_t i = 0; i < o3d_mesh->triangles_.size(); i++){
+        auto face = o3d_mesh->triangles_[i];
+        int v0 = face[0];
+        int v1 = face[1];
+        int v2 = face[2];
+        auto triangle_center = (o3d_mesh->vertices_[v0] + o3d_mesh->vertices_[v1] + o3d_mesh->vertices_[v2]) / 3;
+        auto direction = (triangle_center - o3d_mesh->GetCenter()).normalized();
+        if (o3d_mesh->triangle_normals_[i].dot(direction) < 0){
+            o3d_mesh->triangle_normals_[i] *= -1;
+        }
+
+    }
+  }
   mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_,
                                  o3d_mesh->triangle_normals_);
   rclcpp::sleep_for(1s); // idk why it is needed
 
   Eigen::Vector3d delta_x = enforce_virtual_fixture(
-      *mesh_, x_new_, vf_pose_, radius_, constraint_planes_, lookup_area_);
+      *mesh_, x_new_, vf_pose_, radius_, constraint_planes_, lookup_area_, *visualizer_);
   vf_pose_ += 0.9 * delta_x;
 
-  visualizer_ =
-      std::make_shared<Visualizer>(this->shared_from_this(), base_link_name_);
   visualizer_->AddPatientMesh(output_mesh_path_, skin_mesh_path_);
   // Start the keyboard input thread
   std::thread input_thread(&VFControl::KeyboardInputLoop, this);
@@ -147,7 +160,7 @@ void VFControl::KeyboardInputLoop()
       direction(2) -= 1;
     x_new_ = x_new_ + direction * 0.003;
     Eigen::Vector3d delta_x = enforce_virtual_fixture(
-        *mesh_, x_new_, vf_pose_, radius_, constraint_planes_, lookup_area_);
+        *mesh_, x_new_, vf_pose_, radius_, constraint_planes_, lookup_area_, *visualizer_);
     visualizer_->UpdateScene(constraint_planes_, x_new_, vf_pose_, radius_);
     vf_pose_ += 0.9 * delta_x;
     direction << 0.0, 0.0, 0.0;

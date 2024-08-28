@@ -93,6 +93,7 @@ private:
     std::string base_link_name_ = "world";
     std::string input_mesh_path_, output_mesh_path_, skin_mesh_path_, mesh_type_;
     std::shared_ptr<Visualizer> visualizer_;
+    double plane_size_;
     int client__id_;
     int ctr_;
     double radius_, lookup_area_;

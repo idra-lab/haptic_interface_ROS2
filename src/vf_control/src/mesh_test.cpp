@@ -12,7 +12,8 @@ void testFindNearest() {
   Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_,
             o3d_mesh->vertex_normals_);
   Eigen::Vector3d point(-0.09, -0.0024, 0.20140033);
-  auto nearest = mesh.find_nearby_triangles(point, 0.03);
+  std::vector<int> nearest;
+  mesh.find_nearby_triangles(point, 0.03, nearest);
   std::cout << "Nearest triangles: " << nearest.size() << std::endl;
   for (auto idx : nearest) {
     std::cout << idx << std::endl;
