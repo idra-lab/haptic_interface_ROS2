@@ -138,7 +138,7 @@ public:
     marker.scale.x = radius * 2;
     marker.scale.y = radius * 2;
     marker.scale.z = radius * 2;
-    marker.color.a = 0.5;
+    marker.color.a = 1.0;
     marker.color.r = 0.0;
     marker.color.g = 1.0;
     marker.color.b = 0.0;

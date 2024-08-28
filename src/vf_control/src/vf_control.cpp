@@ -59,8 +59,8 @@ void VFControl::Initialize()
     }
     else if (mesh_type_ == "sphere")
     {
-        x_new_ << -0.09, -0.0024, 0.20140033;
-        vf_pose_ << -0.09, -0.0024, 0.20140033;
+        x_new_ << -0.1, 0.0, 0.30;
+        vf_pose_ << -0.1, 0.0, 0.30;
         o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 20);
     }
     else if (mesh_type_ == "file")
