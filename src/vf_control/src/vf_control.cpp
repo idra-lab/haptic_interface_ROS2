@@ -65,13 +65,15 @@ void VFControl::Initialize()
     }
     else if (mesh_type_ == "file")
     {
-        // auto o3d_mesh_tmp = std::make_shared<open3d::geometry::TriangleMesh>();
-        // open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh_tmp);
-        // auto mesh_tmp = std::make_shared<Mesh>(o3d_mesh_tmp->vertices_, o3d_mesh_tmp->triangles_, o3d_mesh_tmp->triangle_normals_);
-        // mesh_tmp->extrudeMeshRadially(Eigen::Vector3d(0, 0, 0), 0.05);
-        // o3d_mesh->vertices_ = mesh_tmp->vertices;
-        // o3d_mesh->triangles_ = mesh_tmp->faces;
-        open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh);
+        auto o3d_mesh_tmp = std::make_shared<open3d::geometry::TriangleMesh>();
+        open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh_tmp);
+        auto mesh_tmp = std::make_shared<Mesh>(o3d_mesh_tmp->vertices_, o3d_mesh_tmp->triangles_, o3d_mesh_tmp->triangle_normals_);
+        mesh_tmp->extrudeMeshRadially(Eigen::Vector3d(0, 0, 0), 0.05);
+        o3d_mesh->vertices_ = mesh_tmp->vertices;
+        o3d_mesh->triangles_ = mesh_tmp->faces;
+        // open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh);
+        open3d::visualization::DrawGeometries({o3d_mesh});
+        RCLCPP_INFO_STREAM(this->get_logger(), "Extruded mesh with " << o3d_mesh->vertices_.size() << " vertices and " << o3d_mesh->triangles_.size() << " triangles.");
     }
     else
     {
@@ -100,7 +102,7 @@ void VFControl::Initialize()
     o3d_mesh->NormalizeNormals();
 
     if (mesh_type_ == "file")
-    {   
+    {
         // make normals point outwards
         for (size_t i = 0; i < o3d_mesh->triangles_.size(); i++)
         {

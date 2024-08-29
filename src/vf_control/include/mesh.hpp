@@ -122,6 +122,9 @@ public:
         extrudeEdgeAlongDirection(faces[i][0], faces[i][2], direction, scale);
       }
     }
+    std::cout << "Face before extrusion: " << num_faces << std::endl;
+    std::cout << "Face after extrusion: " << faces.size() << std::endl;
+
   }
   void extrudeEdgeAlongDirection(const int v1,const int v2, const Eigen::Vector3d &direction, const double scale)
   {
