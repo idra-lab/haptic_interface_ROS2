@@ -64,7 +64,7 @@ public:
     marker.color.a = 0.2;
     marker.mesh_resource = "file://" + skin_mesh_path;
     marker.id = 1;
-    marker_array.markers.push_back(marker);
+    // marker_array.markers.push_back(marker);
     for (int i = 0; i < 20; i++)
     {
       marker_pub_->publish(marker_array);

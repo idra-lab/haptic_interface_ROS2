@@ -65,14 +65,14 @@ void VFControl::Initialize()
     }
     else if (mesh_type_ == "file")
     {
-        auto o3d_mesh_tmp = std::make_shared<open3d::geometry::TriangleMesh>();
-        open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh_tmp);
-        auto mesh_tmp = std::make_shared<Mesh>(o3d_mesh_tmp->vertices_, o3d_mesh_tmp->triangles_, o3d_mesh_tmp->triangle_normals_);
-        mesh_tmp->extrudeMeshRadially(Eigen::Vector3d(0, 0, 0), 0.05);
-        o3d_mesh->vertices_ = mesh_tmp->vertices;
-        o3d_mesh->triangles_ = mesh_tmp->faces;
-        // open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh);
-        open3d::visualization::DrawGeometries({o3d_mesh});
+        // auto o3d_mesh_tmp = std::make_shared<open3d::geometry::TriangleMesh>();
+        // open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh_tmp);
+        // auto mesh_tmp = std::make_shared<Mesh>(o3d_mesh_tmp->vertices_, o3d_mesh_tmp->triangles_, o3d_mesh_tmp->triangle_normals_);
+        // mesh_tmp->extrudeMeshRadially(Eigen::Vector3d(0, 0, 0), 0.05);
+        // o3d_mesh->vertices_ = mesh_tmp->vertices;
+        // o3d_mesh->triangles_ = mesh_tmp->faces;
+        open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh);
+        // open3d::visualization::DrawGeometries({o3d_mesh});
         RCLCPP_INFO_STREAM(this->get_logger(), "Extruded mesh with " << o3d_mesh->vertices_.size() << " vertices and " << o3d_mesh->triangles_.size() << " triangles.");
     }
     else
@@ -110,9 +110,9 @@ void VFControl::Initialize()
             int v0 = face[0];
             int v1 = face[1];
             int v2 = face[2];
-            auto triangle_center = (o3d_mesh->vertices_[v0] + o3d_mesh->vertices_[v1] + o3d_mesh->vertices_[v2]) / 3;
-            auto direction = (triangle_center - o3d_mesh->GetCenter()).normalized();
-            if (o3d_mesh->triangle_normals_[i].dot(direction) < 0)
+            // auto triangle_center = (o3d_mesh->vertices_[v0] + o3d_mesh->vertices_[v1] + o3d_mesh->vertices_[v2]) / 3;
+            // auto direction = (triangle_center - o3d_mesh->GetCenter()).normalized();
+            if (true) // o3d_mesh->triangle_normals_[i].dot(direction) < 0)
             {
                 o3d_mesh->triangle_normals_[i] *= -1;
             }

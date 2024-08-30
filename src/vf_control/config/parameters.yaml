@@ -7,9 +7,9 @@ vf_control:
     local_ip_address: "192.168.100.50"
     # vf params
     mesh_type: "file" # knot, sphere, file, bunny 
-    input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/projected_skel.obj"
+    input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/swept_mesh_ellips.obj"
     skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj"
-    output_mesh_path : "/home/nardi/SKEL_WS/ros2_ws/output_model.obj"
-    radius: 0.01
-    lookup_area: 0.025 # should be at least 2*radius
-    plane_size: 0.003
+    output_mesh_path : "/home/nardi/SKEL_WS/ros2_ws/swept_mesh_ellips2.obj"
+    radius: 0.02
+    lookup_area: 0.1 # should be at least 2*radius
+    plane_size: 0.03
