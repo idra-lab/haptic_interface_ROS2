@@ -57,14 +57,19 @@ public:
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
     InitMsg(marker);
-    marker.id = 0;
     marker.ns = "patient";
-    marker.mesh_resource = "file://" + output_mesh_path;
-    marker_array.markers.push_back(marker);
+    // add skin mesh
+    marker.id = 0;
     marker.color.a = 0.2;
     marker.mesh_resource = "file://" + skin_mesh_path;
+    marker_array.markers.push_back(marker);
+    // add vf
+    marker.mesh_resource = "file://" + output_mesh_path;
     marker.id = 1;
-    // marker_array.markers.push_back(marker);
+    marker.color.a = 1.0;
+    marker.color.b = 0.0;
+    marker.color.g = 0.0;
+    marker_array.markers.push_back(marker);
     for (int i = 0; i < 20; i++)
     {
       marker_pub_->publish(marker_array);

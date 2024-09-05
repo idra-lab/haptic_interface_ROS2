@@ -52,8 +52,8 @@ def generate_launch_description():
         period=2.5,
         actions=[
             Node(
-                package="vf_control",
-                executable="vf_control",
+                package="vf_control_full",
+                executable="vf_control_full",
                 # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
                     ParameterFile(vf_params)
