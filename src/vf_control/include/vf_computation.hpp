@@ -1,9 +1,7 @@
 #ifndef VF_COMPUTATION_HPP
 #define VF_COMPUTATION_HPP
 #define DEBUG true
-#include "mesh.hpp"
 #include "qp_wrapper.hpp"
-#include "visualization.hpp"
 
 namespace compute_vf
 {
@@ -46,7 +44,7 @@ namespace compute_vf
     // Construct constraints based on nearby triangles
     constraint_planes.clear();
 
-    const double eps = 0.005;
+    const double eps = 0.001;
 
     // Precompute CPi for all triangles
     std::unordered_map<int, std::pair<Eigen::Vector3d, Location>> CP;
@@ -252,10 +250,9 @@ namespace compute_vf
     const Eigen::Matrix<real_t, 3, 3, Eigen::RowMajor> H =
         Eigen::Matrix<real_t, 3, 3, Eigen::RowMajor>::Identity();
     // gradient vector
-    // auto direction = target_position - current_position;
-    // double step_size = std::min(direction.norm(), radius / 2);
-    // Eigen::Vector3d delta_x_des = direction.normalized() * step_size;
-    auto delta_x_des = target_position - current_position;
+    auto direction = target_position - current_position;
+    double step_size = std::min(direction.norm(), radius / 10);
+    Eigen::Vector3d delta_x_des = direction.normalized() * step_size;
     Eigen::Vector<real_t, 3> g = -2 * (delta_x_des);
     // constraint matrix
     Eigen::Vector<real_t, Eigen::Dynamic> A_lb(n_constraints);
@@ -265,7 +262,7 @@ namespace compute_vf
     {
       const Eigen::Vector3d n = constraint_planes[i].first;
       const Eigen::Vector3d p = constraint_planes[i].second;
-      A_lb(i) = -n.transpose() * (current_position - p) + radius;
+      A_lb(i) = -n.transpose() * (current_position - p);
       A(i, 0) = n[0];
       A(i, 1) = n[1];
       A(i, 2) = n[2];
@@ -275,12 +272,11 @@ namespace compute_vf
     qpOASES::QProblem min_problem(3, n_constraints);
     min_problem.setOptions(myOptions);
     Eigen::Vector<real_t, 3> delta_x;
-    int nWSR = 100;
+    int nWSR = 200;
     min_problem.init(H.data(), g.data(), A.data(), 0, 0, A_lb.data(), 0, nWSR);
     min_problem.getPrimalSolution(delta_x.data());
     // // std::cout << "delta_x: " << delta_x << std::endl;
-    double step_size = std::min(delta_x_des.norm(), radius);
-    delta_x = delta_x.normalized() * step_size;
+
 
     return delta_x.cast<double>();
   }

@@ -533,6 +533,9 @@ void HapticControlBase::impedanceThread()
   
   auto delta_x = vf_enforcer_->EnforceVF(x_desired);
   
+  target_pose_vf_.header.stamp = this->get_clock()->now();
+  target_pose_vf_.header.frame_id = base_link_name_;
+  target_pose_vf_.header.frame_id = target_pose_.header.frame_id;
   target_pose_vf_.pose.position.x = old_target_pose_vf_.pose.position.x + delta_x[0];
   target_pose_vf_.pose.position.y = old_target_pose_vf_.pose.position.y + delta_x[1];
   target_pose_vf_.pose.position.z = old_target_pose_vf_.pose.position.z + delta_x[2];

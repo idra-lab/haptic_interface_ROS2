@@ -2,13 +2,6 @@
 haptic_control:
   ros__parameters:
     # vf params
-    mesh_type: "file" # knot, sphere, file, bunny 
-    input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj"
-    skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj"
-    output_mesh_path : "/home/nardi/SKEL_WS/ros2_ws/final_vf2.obj"
-    radius: 0.001
-    lookup_area: 0.01 # should be at least 2*radius
-    plane_size: 0.01 # plane size used to visualize active constraints in rviz
 
     channel: "SimpleChannelUDP"
     ff_device_ip_address: "192.168.100.53"
@@ -42,12 +35,12 @@ haptic_control:
     safety_box_width: 0.2
     safety_box_height: 0.2
 
-vf_control:
-  ros__parameters:
+# vf_control:
+#   ros__parameters:
     mesh_type: "file" # knot, sphere, file, bunny 
     input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj"
     skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj"
     output_mesh_path : "/home/nardi/SKEL_WS/ros2_ws/final_vf2.obj"
-    radius: 0.001
-    lookup_area: 0.01 # should be at least 2*radius
+    radius: 0.005
+    lookup_area: 0.005 # should be at least 2*radius
     plane_size: 0.01 # plane size used to visualize active constraints in rviz

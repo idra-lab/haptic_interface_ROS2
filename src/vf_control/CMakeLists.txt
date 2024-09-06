@@ -64,14 +64,16 @@ add_library(qpoases::qpoases ALIAS qpoases_helper)
 # message(STATUS "Open3D include dir: ${Open3D_INCLUDE_DIRS}")
 
 # add_executable(vf_control_test src/vf_control_test.cpp)
-add_executable(vf_control src/haptic_control_base.cpp src/vf_enforcer.cpp)
-add_executable(mesh_test src/mesh_test.cpp)
 
+# add_library(vf_enforcer src/vf_enforcer.cpp)
+add_executable(vf_control src/haptic_control_base.cpp) 
+# add_executable(mesh_test src/mesh_test.cpp)
+
+# ament_target_dependencies(vf_enforcer rclcpp tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(vf_control rclcpp raptor_api_interfaces haption_raptor_api tf2_ros tf2_geometry_msgs visualization_msgs)
-# ament_target_dependencies(vf_control_test rclcpp tf2_geometry_msgs visualization_msgs raptor_api_interfaces)
 
-include_directories(vf_control PUBLIC include)
-include_directories(mesh_test PUBLIC include)
+include_directories(include)
+# include_directories(mesh_test PUBLIC include)
 
 
 # target_include_directories(mesh_test ${Open3D_INCLUDE_DIRS})
@@ -80,16 +82,16 @@ include_directories(mesh_test PUBLIC include)
 # ${CMAKE_CURRENT_SOURCE_DIR}/../../install/raptor_api_interfaces/include/raptor_api_interfaces
 # ${CMAKE_CURRENT_SOURCE_DIR}/../../install/raptor_api_interfaces/include/
 # )
-
 target_link_libraries(vf_control Eigen3::Eigen Open3D::Open3D qpoases::qpoases)
+# target_link_libraries(vf_control vf_enforcer)
 # target_link_libraries(vf_control_test Eigen3::Eigen Open3D::Open3D qpoases::qpoases)
-target_link_libraries(mesh_test Eigen3::Eigen Open3D::Open3D)
+# target_link_libraries(mesh_test Eigen3::Eigen Open3D::Open3D)
 
 install(TARGETS ${This} vf_control
   DESTINATION lib/${PROJECT_NAME})
 
-install(TARGETS ${This} mesh_test 
-DESTINATION lib/${PROJECT_NAME})
+# install(TARGETS ${This} mesh_test 
+# DESTINATION lib/${PROJECT_NAME})
 
 install(
   DIRECTORY launch config

@@ -125,7 +125,7 @@ public:
 
   void UpdateScene(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>
                        constraint_planes,
-                   Eigen::Vector3d x_new, Eigen::Vector3d vf_pose,
+                   Eigen::Vector3d target, Eigen::Vector3d vf_pose,
                    double radius)
   {
 
@@ -151,9 +151,9 @@ public:
 
     marker.ns = "target_pose";
     marker.id = 2;
-    marker.pose.position.x = x_new(0);
-    marker.pose.position.y = x_new(1);
-    marker.pose.position.z = x_new(2);
+    marker.pose.position.x = target(0);
+    marker.pose.position.y = target(1);
+    marker.pose.position.z = target(2);
     marker.color.r = 1.0;
     marker.color.g = 0.0;
     marker_array.markers.push_back(marker);

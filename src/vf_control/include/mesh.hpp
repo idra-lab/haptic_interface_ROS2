@@ -11,9 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "location.hpp"
 #include "open3d/Open3D.h"
-// nlohmann json
 #include "closest_on_triangle.hpp"
 #include "json.hpp"
 

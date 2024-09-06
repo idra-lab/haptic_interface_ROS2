@@ -59,4 +59,4 @@ inline Location intToLocation(int i)
         return Location::VOID;
     }
 };
-#endif
+#endif // LOCATION_HPP
