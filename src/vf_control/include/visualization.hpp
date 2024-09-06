@@ -54,6 +54,9 @@ public:
   void AddPatientMesh(std::string output_mesh_path,
                       std::string skin_mesh_path)
   {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Adding rib case mesh with path: " << output_mesh_path);
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Adding skin mesh with path: " << skin_mesh_path);
+
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
     InitMsg(marker);

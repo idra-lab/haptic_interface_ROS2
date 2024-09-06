@@ -43,4 +43,4 @@ haptic_control:
     output_mesh_path : "/home/nardi/SKEL_WS/ros2_ws/final_vf2.obj"
     radius: 0.005
     lookup_area: 0.005 # should be at least 2*radius
-    plane_size: 0.01 # plane size used to visualize active constraints in rviz
+    plane_size: 0.001 # plane size used to visualize active constraints in rviz

@@ -17,6 +17,7 @@ public:
         this->mesh_type_ = node_->get_parameter("mesh_type").as_string();
         this->input_mesh_path_ = node_->get_parameter("input_mesh_path").as_string();
         this->output_mesh_path_ = node_->get_parameter("output_mesh_path").as_string();
+        this->skin_mesh_path_ = node_->get_parameter("skin_mesh_path").as_string();
         this->radius_ = node_->get_parameter("radius").as_double();
         this->lookup_area_ = node_->get_parameter("lookup_area").as_double();
         this->plane_size_ = node_->get_parameter("plane_size").as_double();
@@ -88,6 +89,7 @@ public:
         this->x_old_ = x_des;
         this->x_des_old = x_des;
         this->delta_x_ << 0, 0, 0;
+        visualizer_->UpdateScene(constraint_planes_, x_des, x_old_, radius_);
     }
 
     Eigen::Vector3d EnforceVF(Eigen::Vector3d x_des)

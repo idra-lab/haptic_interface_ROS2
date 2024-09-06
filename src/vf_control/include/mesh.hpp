@@ -38,7 +38,7 @@ public:
     // Build a KDTree for the point cloud
     point_cloud_ = std::make_shared<open3d::geometry::PointCloud>();
     point_cloud_->points_ = vertices;
-
+    
     kdtree.SetGeometry(*point_cloud_);
     std::cout << "Precomputing transformation matrices" << std::endl;
     precompute_triangle_xfm();
