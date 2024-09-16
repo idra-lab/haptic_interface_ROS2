@@ -79,16 +79,17 @@ public:
         if (mesh_type_ == "file")
         {
             // make normals point outwards
-            for (size_t i = 0; i < o3d_mesh->triangles_.size(); i++)
-            {
-                o3d_mesh->triangle_normals_[i] *= -1;
-            }
+            // for (size_t i = 0; i < o3d_mesh->triangles_.size(); i++)
+            // {
+            //     o3d_mesh->triangle_normals_[i] *= -1;
+            // }
         }
         RCLCPP_INFO_STREAM(node->get_logger(), "Computing mesh properties...");
         mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->triangle_normals_);
         this->x_old_ = x_des;
         this->x_des_old = x_des;
         this->delta_x_ << 0, 0, 0;
+
         visualizer_->UpdateScene(constraint_planes_, x_des, x_old_, radius_);
     }
 
@@ -103,6 +104,13 @@ public:
         auto x_new = x_old_ + delta_x_;
         x_old_ = x_new;
         x_des_old = x_des;
+        geometry_msgs::msg::PoseStamped target_pose_vf;
+        target_pose_vf.header.stamp = node_->now();
+        target_pose_vf.header.frame_id = "base_link";
+        target_pose_vf.pose.position.x = x_new[0];
+        target_pose_vf.pose.position.y = x_new[1];
+        target_pose_vf.pose.position.z = x_new[2];
+        target_pose_vf.pose.orientation.w = 1.0;
         visualizer_->UpdateScene(constraint_planes_,x_des,x_new,radius_);
         return delta_x_;
     }
@@ -115,6 +123,8 @@ public:
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> constraint_planes_;
     // VARIABLES
     std::string input_mesh_path_, output_mesh_path_, skin_mesh_path_, mesh_type_;
+
+
     std::shared_ptr<Visualizer> visualizer_;
     double plane_size_;
     int client__id_;

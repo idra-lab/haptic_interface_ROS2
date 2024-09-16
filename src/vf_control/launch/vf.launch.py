@@ -16,6 +16,7 @@ def generate_launch_description():
     
     ld = LaunchDescription()
 
+    use_fixtures = LaunchConfiguration('use_fixtures', default=True)
     rviz = Node(
         package="rviz2",
         executable="rviz2",
@@ -56,8 +57,10 @@ def generate_launch_description():
                 executable="vf_control",
                 # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
-                    ParameterFile(vf_params)
+                    ParameterFile(vf_params),
+                    {"use_fixtures": use_fixtures}
                 ],
+                remappings=[('bus0/ft_sensor0/ft_sensor_readings/wrench', '/force_torque_sensor_broadcaster/wrench')],
                 # prefix=["xterm -hold -fa 'Monospace' -fs 14 -e "],
                 # output='screen',
                 # emulate_tty=True,

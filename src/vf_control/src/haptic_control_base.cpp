@@ -15,6 +15,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
   // safety sphere around robot base link to prevent singularity
   this->enable_safety_sphere_ =
       this->get_parameter("enable_safety_sphere").as_bool();
+  use_fixtures_ = this->get_parameter("use_fixtures").as_bool();
   if (this->enable_safety_sphere_)
   {
     this->safety_sphere_radius_ =
@@ -78,6 +79,12 @@ HapticControlBase::HapticControlBase(const std::string &name,
   target_frame_pub_ =
       this->create_publisher<geometry_msgs::msg::PoseStamped>(
           "target_frame", 1);
+  desired_frame_pub_ =
+      this->create_publisher<geometry_msgs::msg::PoseStamped>(
+          "desired_frame", 1);
+  current_frame_pub_ =
+      this->create_publisher<geometry_msgs::msg::PoseStamped>(
+          "current_frame", 1);
 
   // create force/wrench subscriber
   ft_subscriber_ = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
@@ -282,30 +289,38 @@ void HapticControlBase::out_virtuose_statusCB(
   status_button_ = msg->buttons;
 }
 
+geometry_msgs::msg::TransformStamped HapticControlBase::getEndEffectorTransform()
+{
+  geometry_msgs::msg::TransformStamped ee_pose;
+  try
+  {
+    ee_pose = tf_buffer_->lookupTransform(base_link_name_, tool_link_name_,
+                                          tf2::TimePointZero);
+    received_ee_pose_ = true;
+  }
+  catch (tf2::TransformException &ex)
+  {
+    RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                          "End Effector pose not available: %s", ex.what());
+  }
+  return ee_pose;
+}
+
 void HapticControlBase::call_impedance_service()
 {
   received_ee_pose_ = false;
+  geometry_msgs::msg::TransformStamped trans;
   while (!received_ee_pose_)
   {
-    try
-    {
-      auto trans = tf_buffer_->lookupTransform(base_link_name_, tool_link_name_,
-                                               tf2::TimePointZero);
-      ee_starting_position.pose.position.x = trans.transform.translation.x;
-      ee_starting_position.pose.position.y = trans.transform.translation.y;
-      ee_starting_position.pose.position.z = trans.transform.translation.z;
-      ee_starting_position.pose.orientation.x = trans.transform.rotation.x;
-      ee_starting_position.pose.orientation.y = trans.transform.rotation.y;
-      ee_starting_position.pose.orientation.z = trans.transform.rotation.z;
-      ee_starting_position.pose.orientation.w = trans.transform.rotation.w;
-      received_ee_pose_ = true;
-    }
-    catch (tf2::TransformException &ex)
-    {
-      RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                            "End Effector pose not available: %s", ex.what());
-    }
+    trans = getEndEffectorTransform();
   }
+  ee_starting_position.pose.position.x = trans.transform.translation.x;
+  ee_starting_position.pose.position.y = trans.transform.translation.y;
+  ee_starting_position.pose.position.z = trans.transform.translation.z;
+  ee_starting_position.pose.orientation.x = trans.transform.rotation.x;
+  ee_starting_position.pose.orientation.y = trans.transform.rotation.y;
+  ee_starting_position.pose.orientation.z = trans.transform.rotation.z;
+  ee_starting_position.pose.orientation.w = trans.transform.rotation.w;
   if (enable_safety_sphere_)
   {
     Eigen::Vector3d ee_start(ee_starting_position.pose.position.x,
@@ -526,25 +541,54 @@ void HapticControlBase::impedanceThread()
                        target_pose_.pose.position.x, target_pose_.pose.position.y,
                        target_pose_.pose.position.z);
 
-  
-  Eigen::Vector3d x_desired(target_pose_.pose.position.x,
-                            target_pose_.pose.position.y,
-                            target_pose_.pose.position.z);
-  
-  auto delta_x = vf_enforcer_->EnforceVF(x_desired);
-  
-  target_pose_vf_.header.stamp = this->get_clock()->now();
-  target_pose_vf_.header.frame_id = base_link_name_;
-  target_pose_vf_.header.frame_id = target_pose_.header.frame_id;
-  target_pose_vf_.pose.position.x = old_target_pose_vf_.pose.position.x + delta_x[0];
-  target_pose_vf_.pose.position.y = old_target_pose_vf_.pose.position.y + delta_x[1];
-  target_pose_vf_.pose.position.z = old_target_pose_vf_.pose.position.z + delta_x[2];
-  target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
-  
-  old_target_pose_vf_ = target_pose_vf_;
-  
+  if (this->use_fixtures_)
+  {
+    Eigen::Vector3d x_desired(target_pose_.pose.position.x,
+                              target_pose_.pose.position.y,
+                              target_pose_.pose.position.z);
+    auto delta_x = vf_enforcer_->EnforceVF(x_desired);
+    target_pose_vf_.header.stamp = this->get_clock()->now();
+    target_pose_vf_.header.frame_id = base_link_name_;
+    target_pose_vf_.header.frame_id = target_pose_.header.frame_id;
+    target_pose_vf_.pose.position.x = old_target_pose_vf_.pose.position.x + delta_x[0];
+    target_pose_vf_.pose.position.y = old_target_pose_vf_.pose.position.y + delta_x[1];
+    target_pose_vf_.pose.position.z = old_target_pose_vf_.pose.position.z + delta_x[2];
+    target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
+
+    old_target_pose_vf_ = target_pose_vf_;
+  }
+
+  // Publish the current ee pose
+  auto ee_pose = getEndEffectorTransform();
+  geometry_msgs::msg::PoseStamped ee_pose_msg;
+  ee_pose_msg.header.stamp = ee_pose.header.stamp;
+  ee_pose_msg.header.frame_id = base_link_name_;
+  ee_pose_msg.pose.position.x = ee_pose.transform.translation.x;
+  ee_pose_msg.pose.position.y = ee_pose.transform.translation.y;
+  ee_pose_msg.pose.position.z = ee_pose.transform.translation.z;
+  ee_pose_msg.pose.orientation.x = ee_pose.transform.rotation.x;
+  ee_pose_msg.pose.orientation.y = ee_pose.transform.rotation.y;
+  ee_pose_msg.pose.orientation.z = ee_pose.transform.rotation.z;
+  ee_pose_msg.pose.orientation.w = ee_pose.transform.rotation.w;
+  current_frame_pub_->publish(ee_pose_msg);
+
+  if (this->use_fixtures_)
+  {
+  // Publish the target pose
   target_frame_pub_->publish(target_pose_vf_);
+  // Publish the target pose tf
   tf_broadcaster_->sendTransform(target_pose_tf_);
+  }
+  else
+  {
+  // Publish the target pose
+  target_frame_pub_->publish(target_pose_);
+  // Publish the target pose tf
+  tf_broadcaster_->sendTransform(target_pose_tf_);
+  }
+  
+  // Publish the desired pose
+  desired_frame_pub_->publish(target_pose_);
 }
 void HapticControlBase::project_target_on_sphere(
     Eigen::Vector3d &target_position_vec, double safety_sphere_radius_)
@@ -560,7 +604,10 @@ int main(int argc, char **argv)
   rclcpp::init(argc, argv);
   auto node = std::make_shared<HapticControlBase>();
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Calling impedance service:");
-  node->InitVFEnforcer();
+  if (node->use_fixtures_)
+  {
+    node->InitVFEnforcer();
+  }
   node->call_impedance_service();
   rclcpp::spin(node);
   rclcpp::shutdown();

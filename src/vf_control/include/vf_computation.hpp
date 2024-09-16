@@ -262,7 +262,7 @@ namespace compute_vf
     {
       const Eigen::Vector3d n = constraint_planes[i].first;
       const Eigen::Vector3d p = constraint_planes[i].second;
-      A_lb(i) = -n.transpose() * (current_position - p) + eps;
+      A_lb(i) = -n.transpose() * (current_position - p) + radius; //ultrasound length = 0.23 mm
       A(i, 0) = n[0];
       A(i, 1) = n[1];
       A(i, 2) = n[2];

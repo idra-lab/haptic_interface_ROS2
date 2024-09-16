@@ -54,12 +54,14 @@ public:
         const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg);
     void call_impedance_service();
     void impedanceThread();
+    geometry_msgs::msg::TransformStamped getEndEffectorTransform();
     void InitVFEnforcer();
     void project_target_on_sphere(Eigen::Vector3d &target_position_vec,
                                   double safety_sphere_radius_);
     geometry_msgs::msg::TransformStamped target_pose_tf_;
     geometry_msgs::msg::PoseStamped target_pose_, target_pose_vf_, current_pose_, old_target_pose_vf_;
     std::string base_link_name_;
+    bool use_fixtures_ = true;
 
 private:
     // ROS2 subscribtions
@@ -74,6 +76,11 @@ private:
         _in_virtuose_force;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
         target_frame_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
+        current_frame_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
+        desired_frame_pub_;
+    
     // ROS2 service client_s
     rclcpp::Client<raptor_api_interfaces::srv::VirtuoseImpedance>::SharedPtr
         client_;
@@ -122,7 +129,6 @@ private:
     std::array<double, 3> bounding_box_center_;
     uint32_t status_state_;
     uint32_t status_button_;
-
     // current and old hapitc positions
     Eigen::Vector3d x_new_, x_old_;
     // current and old haptic displacements

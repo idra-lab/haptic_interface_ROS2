@@ -67,14 +67,14 @@ VFEnforcer::VFEnforcer(std::shared_ptr<rclcpp::Node> node, Eigen::Vector3d x_des
     o3d_mesh->OrientTriangles();
     o3d_mesh->NormalizeNormals();
 
-    if (mesh_type_ == "file")
-    {
+    // if (mesh_type_ == "file")
+    // {
         // make normals point outwards
-        for (size_t i = 0; i < o3d_mesh->triangles_.size(); i++)
-        {
-            o3d_mesh->triangle_normals_[i] *= -1;
-        }
-    }
+        // for (size_t i = 0; i < o3d_mesh->triangles_.size(); i++)
+        // {
+        //     o3d_mesh->triangle_normals_[i] *= -1;
+        // }
+    // } 
     RCLCPP_INFO_STREAM(node->get_logger(), "Computing mesh properties...");
     mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_, o3d_mesh->triangle_normals_);
     this->old_x_ = x_des;
