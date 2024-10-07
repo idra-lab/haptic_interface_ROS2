@@ -82,7 +82,7 @@ include_directories(include)
 # ${CMAKE_CURRENT_SOURCE_DIR}/../../install/raptor_api_interfaces/include/raptor_api_interfaces
 # ${CMAKE_CURRENT_SOURCE_DIR}/../../install/raptor_api_interfaces/include/
 # )
-target_link_libraries(vf_control Eigen3::Eigen Open3D::Open3D qpoases::qpoases)
+target_link_libraries(vf_control Eigen3::Eigen Open3D::Open3D qpoases::qpoases gomp)
 # target_link_libraries(vf_control vf_enforcer)
 # target_link_libraries(vf_control_test Eigen3::Eigen Open3D::Open3D qpoases::qpoases)
 # target_link_libraries(mesh_test Eigen3::Eigen Open3D::Open3D)

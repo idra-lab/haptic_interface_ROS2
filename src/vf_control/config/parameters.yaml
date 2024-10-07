@@ -35,7 +35,7 @@ haptic_control:
     safety_box_width: 0.2
     safety_box_height: 0.2
 
-# vf_control:
+# vf parameters:
 #   ros__parameters:
     mesh_type: "file" # knot, sphere, file, bunny 
     input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj"

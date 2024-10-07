@@ -10,6 +10,12 @@ This guide is written for Linux, Windows users need to adapt it in the appropria
    ```bash
    sudo apt-get install libpciaccess-dev
    ``` 
+The next requirements are needed only if the virtual fixtures are used, otherwise you can delete the `vf_control` package
+- OpenMP
+  ```
+  sudo apt install libomp-dev
+  ```
+<!-- - Open3D [from source](https://www.open3d.org/docs/release/compilation.html) -->
 
 ## Installation
 0. Clone as a workspace named `haption_ws`:
@@ -24,7 +30,7 @@ This guide is written for Linux, Windows users need to adapt it in the appropria
     cp  <path_to_ws>/src/haptic_interface_ROS2/*.sh  <path_to_ws>
     ```
 2. Copy the RaptorAPI shared libraries to `src/haption_raptor_api/Dependencies/RaptorAPI/bin/Linux/glibc-<version>`
-3. Make sure that the  `.param` file for your device is accessible under `/etc/Haption/Connector`
+3. Copy the `desktop_6D_n65.param` in `/etc/Haption/Connector`. Create the missing folders if needed. The parameters file is stored in the IDRA drive folder [here](https://drive.google.com/drive/folders/1g4NHb75PtUcHunHAImuzkCfoDhdFXWoR?usp=sharing), request access to the drive if you need to use the haptic interface.
 4. Compile the raptor_api_interfaces:
     ```bash
     colcon build --packages-select raptor_api_interfaces

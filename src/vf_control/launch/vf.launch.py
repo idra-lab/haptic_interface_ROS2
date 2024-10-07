@@ -8,6 +8,10 @@ from launch_ros.parameter_descriptions import ParameterFile
 from launch.actions import TimerAction, DeclareLaunchArgument
 # get package share directory
 from ament_index_python.packages import get_package_share_directory
+from launch.actions import DeclareLaunchArgument
+# PythonExpression
+from launch.conditions import LaunchConfigurationEquals
+from launch.actions import LogInfo 
 import time
 import sys
 
@@ -16,13 +20,8 @@ def generate_launch_description():
     
     ld = LaunchDescription()
 
-    use_fixtures = LaunchConfiguration('use_fixtures', default=True)
-    rviz = Node(
-        package="rviz2",
-        executable="rviz2",
-        arguments=["-d", get_package_share_directory("vf_control") + "/config/vf.rviz"],
-        output={'both': 'log'}
-    )
+    use_fixtures = DeclareLaunchArgument("use_fixtures", default_value="false", description="Use fixtures for the VF")
+    
     # haptic_wrapper
     haptic_wrapper = TimerAction(
         period = 0.0,
@@ -58,7 +57,7 @@ def generate_launch_description():
                 # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
                     ParameterFile(vf_params),
-                    {"use_fixtures": use_fixtures}
+                    {"use_fixtures": LaunchConfiguration("use_fixtures")}
                 ],
                 remappings=[('bus0/ft_sensor0/ft_sensor_readings/wrench', '/force_torque_sensor_broadcaster/wrench')],
                 # prefix=["xterm -hold -fa 'Monospace' -fs 14 -e "],
@@ -68,12 +67,22 @@ def generate_launch_description():
             )
         ]
     )
-
+    info = LogInfo(msg=LaunchConfiguration("use_fixtures"))
+    # load rviz if use_fixtures is true using ifcondition
+    rviz = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='screen',
+        arguments=['-d', get_package_share_directory('vf_control') + '/rviz/vf.rviz'],
+        condition=LaunchConfigurationEquals('use_fixtures', 'true')
+    )
     
-    ld.add_action(rviz)
     ld.add_action(haptic_wrapper)
     ld.add_action(haptic_calibration_node)
+    ld.add_action(info)
     ld.add_action(vf_node)
+    ld.add_action(rviz)
     return ld
 
 
