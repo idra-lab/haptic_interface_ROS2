@@ -94,7 +94,7 @@ install(TARGETS ${This} vf_control
 # DESTINATION lib/${PROJECT_NAME})
 
 install(
-  DIRECTORY launch config
+  DIRECTORY launch config rviz
   DESTINATION share/${PROJECT_NAME}
 )
 

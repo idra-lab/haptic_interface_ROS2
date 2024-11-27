@@ -38,9 +38,9 @@ haptic_control:
 # vf parameters:
 #   ros__parameters:
     mesh_type: "file" # knot, sphere, file, bunny 
-    input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj"
-    skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj"
-    output_mesh_path : "/home/nardi/SKEL_WS/ros2_ws/final_vf2.obj"
+    input_mesh_path: "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/final_vf.obj"
+    skin_mesh_path: "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/skin_mesh.obj"
+    output_mesh_path : "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/final_vf2.obj"
     radius: 0.005
     lookup_area: 0.006 # should be at least 2*radius
     plane_size: 0.001 # plane size used to visualize active constraints in rviz
