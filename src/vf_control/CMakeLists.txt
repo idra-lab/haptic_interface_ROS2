@@ -24,19 +24,16 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Open3D QUIET)
-if (Open3D_FOUND)
-    message(STATUS "Found Open3D installed locally")
-else()
-    message(STATUS "Open3D not found, downloading...")
-    include(FetchContent)
-    FetchContent_Declare(
-        Open3D
-        DOWNLOAD_EXTRACT_TIMESTAMP NEW
-        URL "https://github.com/isl-org/Open3D/releases/download/v0.18.0/open3d-devel-linux-x86_64-cxx11-abi-0.18.0.tar.xz"
-    )
-    FetchContent_MakeAvailable(Open3D)
-    find_package(Open3D REQUIRED HINTS ${open3d_SOURCE_DIR})
+find_package(Open3D REQUIRED)
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(vf_test test/vf_test.cpp)
+  target_include_directories(vf_test PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_link_libraries(vf_test Eigen3::Eigen Open3D::Open3D qpoases::qpoases)
 endif()
 
 set (QPOASES_INSTALL_DIR ${CMAKE_BINARY_DIR}/qpoases_install)
@@ -63,10 +60,10 @@ add_library(qpoases::qpoases ALIAS qpoases_helper)
 
 # message(STATUS "Open3D include dir: ${Open3D_INCLUDE_DIRS}")
 
-# add_executable(vf_control_test src/vf_control_test.cpp)
 
 # add_library(vf_enforcer src/vf_enforcer.cpp)
 add_executable(vf_control src/haptic_control_base.cpp) 
+add_executable(vf_control_keyboard src/vf_control_keyboard.cpp)
 # add_executable(mesh_test src/mesh_test.cpp)
 
 # ament_target_dependencies(vf_enforcer rclcpp tf2_geometry_msgs visualization_msgs)
@@ -84,7 +81,7 @@ include_directories(include)
 # )
 target_link_libraries(vf_control Eigen3::Eigen Open3D::Open3D qpoases::qpoases gomp)
 # target_link_libraries(vf_control vf_enforcer)
-# target_link_libraries(vf_control_test Eigen3::Eigen Open3D::Open3D qpoases::qpoases)
+# target_link_libraries(vf_control_keyboard Eigen3::Eigen Open3D::Open3D qpoases::qpoases)
 # target_link_libraries(mesh_test Eigen3::Eigen Open3D::Open3D)
 
 install(TARGETS ${This} vf_control
