@@ -49,6 +49,14 @@ HapticControlBase::HapticControlBase(const std::string &name,
   this->base_link_name_ = this->get_parameter("base_link_name").as_string();
   this->ft_link_name_ = this->get_parameter("ft_link_name").as_string();
 
+  // delay simulation
+  this->delay_ = this->get_parameter("delay").as_double();
+  this->delay_ = std::clamp(this->delay_, 0.0, 10.0);
+  if(std::abs(this->delay_) > 1e-6)
+  {
+    RCLCPP_INFO(this->get_logger(), "A Delay of %f seconds is set", this->delay_);
+  }
+
   // Create a parameter subscriber that can be used to monitor parameter changes
   param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
   this->get_parameter("max_force_", max_force_);
@@ -186,13 +194,7 @@ void HapticControlBase::SetWrenchCB(
   current_wrench_.header.stamp = target_wrench.header.stamp;
   geometry_msgs::msg::WrenchStamped force;
   force.header.stamp = target_wrench.header.stamp;
-  force.wrench.force.x = target_wrench.wrench.force.x;
-  force.wrench.force.y = target_wrench.wrench.force.y;
-  force.wrench.force.z = target_wrench.wrench.force.z;
-  force.wrench.torque.x = target_wrench.wrench.torque.x;
-  force.wrench.torque.y = target_wrench.wrench.torque.y;
-  force.wrench.torque.z = target_wrench.wrench.torque.z;
-
+  force.wrench = target_wrench.wrench;
   // Map forces from probe frame to haptic base frame (since haptic base frame
   // coincides with robot base frame)
   try
@@ -201,23 +203,14 @@ void HapticControlBase::SetWrenchCB(
                                              tf2::TimePointZero);
     // apply rotation to the force
     tf2::doTransform(force, force, trans);
-
-    current_wrench_.wrench.force.x = force.wrench.force.x;
-    current_wrench_.wrench.force.y = force.wrench.force.y;
-    current_wrench_.wrench.force.z = force.wrench.force.z;
-    current_wrench_.wrench.torque.x = force.wrench.torque.x;
-    current_wrench_.wrench.torque.y = force.wrench.torque.y;
-    current_wrench_.wrench.torque.z = force.wrench.torque.z;
+    current_wrench_.wrench = force.wrench;
   }
   catch (tf2::TransformException &ex)
   {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 200,
                           "F/T sensor pose transform not available: %s",
                           ex.what());
-    current_wrench_.wrench.force.x = current_wrench_.wrench.force.y =
-        current_wrench_.wrench.force.z = 0.0;
-    current_wrench_.wrench.torque.x = current_wrench_.wrench.torque.y =
-        current_wrench_.wrench.torque.z = 0.0;
+    current_wrench_.wrench = geometry_msgs::msg::Wrench();
     return;
   }
 }
@@ -229,20 +222,8 @@ void HapticControlBase::out_virtuose_pose_CB(
   {
     // Store last pose date
     received_haptic_pose_ = true;
-    haptic_starting_position_.pose.position.x =
-        msg->virtuose_pose.translation.x;
-    haptic_starting_position_.pose.position.y =
-        msg->virtuose_pose.translation.y;
-    haptic_starting_position_.pose.position.z =
-        msg->virtuose_pose.translation.z;
-    haptic_starting_position_.pose.orientation.x =
-        msg->virtuose_pose.rotation.x;
-    haptic_starting_position_.pose.orientation.y =
-        msg->virtuose_pose.rotation.y;
-    haptic_starting_position_.pose.orientation.z =
-        msg->virtuose_pose.rotation.z;
-    haptic_starting_position_.pose.orientation.w =
-        msg->virtuose_pose.rotation.w;
+    haptic_starting_position_.pose.position = vector3ToPoint(msg->virtuose_pose.translation);
+    haptic_starting_position_.pose.orientation = msg->virtuose_pose.rotation;
     x_new_ << haptic_starting_position_.pose.position.x,
         haptic_starting_position_.pose.position.y,
         haptic_starting_position_.pose.position.z;
@@ -314,13 +295,8 @@ void HapticControlBase::call_impedance_service()
   {
     trans = getEndEffectorTransform();
   }
-  ee_starting_position.pose.position.x = trans.transform.translation.x;
-  ee_starting_position.pose.position.y = trans.transform.translation.y;
-  ee_starting_position.pose.position.z = trans.transform.translation.z;
-  ee_starting_position.pose.orientation.x = trans.transform.rotation.x;
-  ee_starting_position.pose.orientation.y = trans.transform.rotation.y;
-  ee_starting_position.pose.orientation.z = trans.transform.rotation.z;
-  ee_starting_position.pose.orientation.w = trans.transform.rotation.w;
+  ee_starting_position.pose.position = vector3ToPoint(trans.transform.translation);
+  ee_starting_position.pose.orientation = trans.transform.rotation;
   if (enable_safety_sphere_)
   {
     Eigen::Vector3d ee_start(ee_starting_position.pose.position.x,
@@ -563,13 +539,8 @@ void HapticControlBase::impedanceThread()
   geometry_msgs::msg::PoseStamped ee_pose_msg;
   ee_pose_msg.header.stamp = ee_pose.header.stamp;
   ee_pose_msg.header.frame_id = base_link_name_;
-  ee_pose_msg.pose.position.x = ee_pose.transform.translation.x;
-  ee_pose_msg.pose.position.y = ee_pose.transform.translation.y;
-  ee_pose_msg.pose.position.z = ee_pose.transform.translation.z;
-  ee_pose_msg.pose.orientation.x = ee_pose.transform.rotation.x;
-  ee_pose_msg.pose.orientation.y = ee_pose.transform.rotation.y;
-  ee_pose_msg.pose.orientation.z = ee_pose.transform.rotation.z;
-  ee_pose_msg.pose.orientation.w = ee_pose.transform.rotation.w;
+  ee_pose_msg.pose.position = vector3ToPoint(ee_pose.transform.translation);
+  ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
   current_frame_pub_->publish(ee_pose_msg);
 
   if (this->use_fixtures_)

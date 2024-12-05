@@ -28,6 +28,7 @@ haptic_control:
     tool_link_name: "probe"
     base_link_name: "base_link"
     ft_link_name: "tool0"
+    delay: 0.0 # round trip simulated delay in seconds (0.0 for no delay)
     force_scale : 0.3
     # safety box that can be activated (centered in the current ee position)
     enable_safety_box: false 

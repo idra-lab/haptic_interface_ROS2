@@ -30,6 +30,7 @@
 #include "tf2_ros/transform_broadcaster.h"
 
 #include "vf_enforcer.hpp"
+#include "utils.hpp"
 
 class HapticControlBase : public rclcpp::Node
 {
@@ -117,6 +118,8 @@ private:
     bool received_ee_pose_;
     bool use_limits_;
     bool enable_safety_sphere_, enable_safety_box_;
+    double delay_;
+    
     // Storage for virtuose_node status
     int64_t status_date_sec_;
     uint32_t status_date_nanosec_;
