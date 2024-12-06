@@ -20,7 +20,17 @@ def generate_launch_description():
     
     ld = LaunchDescription()
 
-    use_fixtures = DeclareLaunchArgument("use_fixtures", default_value="false", description="Use fixtures for the VF")
+    # use_fixtures = DeclareLaunchArgument(
+    #     'use_fixtures',
+    #     default_value='false',
+    #     description='Use this argument to activate the fixtures (true or false)'
+    # )
+        
+    # simulated_delay = DeclareLaunchArgument(
+    #     'simulated_delay',
+    #     default_value=0.0,
+    #     description='Use this argument to simulate a delay in the system (in seconds), use 0.0 for no delay'
+    # )
     
     # haptic_wrapper
     haptic_wrapper = TimerAction(
@@ -57,9 +67,11 @@ def generate_launch_description():
                 # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
                     ParameterFile(vf_params),
-                    {"use_fixtures": LaunchConfiguration("use_fixtures")}
+                    {"use_fixtures": LaunchConfiguration("use_fixtures")},
+                    {"delay": LaunchConfiguration("delay")}
                 ],
                 remappings=[('bus0/ft_sensor0/ft_sensor_readings/wrench', '/force_torque_sensor_broadcaster/wrench')],
+
                 # prefix=["xterm -hold -fa 'Monospace' -fs 14 -e "],
                 # output='screen',
                 # emulate_tty=True,
