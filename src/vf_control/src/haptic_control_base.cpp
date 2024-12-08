@@ -50,7 +50,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
   this->delay_ = this->get_parameter("delay").as_double();
   this->delay_ = std::clamp(this->delay_, 0.0, 10.0);
   if (std::abs(this->delay_) > 1e-6) {
-    RCLCPP_INFO(this->get_logger(), "A Delay of %f seconds is set",
+    RCLCPP_WARN(this->get_logger(), "A Delay of %f seconds is set",
                 this->delay_);
   }
 
@@ -91,7 +91,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
   // create force/wrench subscriber
   ft_subscriber_ = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
       "bus0/ft_sensor0/ft_sensor_readings/wrench", 1,
-      std::bind(&HapticControlBase::SetWrenchCB, this, _1));
+      std::bind(&HapticControlBase::set_wrench, this, _1));
 
   client_ = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
       "virtuose_impedance");
@@ -146,7 +146,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
   x_tilde_old_ << 0.0, 0.0, 0.0;
 }
 
-void HapticControlBase::InitVFEnforcer() {
+void HapticControlBase::init_vf_enforcer() {
   // Init virtual fixture enforcer
   vf_enforcer_ = std::make_shared<VFEnforcer>(this->shared_from_this(), x_new_);
 }
@@ -180,7 +180,7 @@ void HapticControlBase::set_safety_box_height_CB(const rclcpp::Parameter &p) {
   safety_box_height_ = std::clamp(p.as_double(), 0.0, 2.0);
 }
 
-void HapticControlBase::SetWrenchCB(
+void HapticControlBase::set_wrench(
     const geometry_msgs::msg::WrenchStamped target_wrench) {
   current_wrench_.header.stamp = target_wrench.header.stamp;
   geometry_msgs::msg::WrenchStamped force;
@@ -209,7 +209,7 @@ void HapticControlBase::out_virtuose_pose_CB(
     // Store last pose date
     received_haptic_pose_ = true;
     haptic_starting_position_.pose.position =
-        vector3ToPoint(msg->virtuose_pose.translation);
+        vector3_to_point(msg->virtuose_pose.translation);
     haptic_starting_position_.pose.orientation = msg->virtuose_pose.rotation;
     x_new_ << haptic_starting_position_.pose.position.x,
         haptic_starting_position_.pose.position.y,
@@ -253,28 +253,26 @@ void HapticControlBase::out_virtuose_statusCB(
   status_button_ = msg->buttons;
 }
 
-geometry_msgs::msg::TransformStamped
-HapticControlBase::getEndEffectorTransform() {
-  geometry_msgs::msg::TransformStamped ee_pose;
+void HapticControlBase::get_ee_trans(
+    geometry_msgs::msg::TransformStamped &trans) {
   try {
-    ee_pose = tf_buffer_->lookupTransform(base_link_name_, tool_link_name_,
-                                          tf2::TimePointZero);
+    trans = tf_buffer_->lookupTransform(base_link_name_, tool_link_name_,
+                                        tf2::TimePointZero);
     received_ee_pose_ = true;
   } catch (tf2::TransformException &ex) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                           "End Effector pose not available: %s", ex.what());
   }
-  return ee_pose;
 }
 
 void HapticControlBase::call_impedance_service() {
   received_ee_pose_ = false;
   geometry_msgs::msg::TransformStamped trans;
   while (!received_ee_pose_) {
-    trans = getEndEffectorTransform();
+    get_ee_trans(trans);
   }
   ee_starting_position.pose.position =
-      vector3ToPoint(trans.transform.translation);
+      vector3_to_point(trans.transform.translation);
   ee_starting_position.pose.orientation = trans.transform.rotation;
   if (enable_safety_sphere_) {
     Eigen::Vector3d ee_start(ee_starting_position.pose.position.x,
@@ -353,12 +351,12 @@ void HapticControlBase::call_impedance_service() {
 
   // Perform impedance loop at 1000 Hz
   impedanceThread_ = this->create_wall_timer(
-      1ms, std::bind(&HapticControlBase::impedanceThread, this));
+      1ms, std::bind(&HapticControlBase::impedance_thread, this));
   RCLCPP_INFO(this->get_logger(), "\033[0;32mImpedance thread started\033[0m");
 }
 
 // This function is called at 1000 Hz
-void HapticControlBase::impedanceThread() {
+void HapticControlBase::impedance_thread() {
   if (!received_haptic_pose_) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                           "Haptic pose not available");
@@ -492,7 +490,7 @@ void HapticControlBase::impedanceThread() {
     Eigen::Vector3d x_desired(target_pose_.pose.position.x,
                               target_pose_.pose.position.y,
                               target_pose_.pose.position.z);
-    auto delta_x = vf_enforcer_->EnforceVF(x_desired);
+    auto delta_x = vf_enforcer_->enforce_vf(x_desired);
     target_pose_vf_.header.stamp = this->get_clock()->now();
     target_pose_vf_.header.frame_id = base_link_name_;
     target_pose_vf_.header.frame_id = target_pose_.header.frame_id;
@@ -508,11 +506,12 @@ void HapticControlBase::impedanceThread() {
   }
 
   // Publish the current ee pose
-  auto ee_pose = getEndEffectorTransform();
+  geometry_msgs::msg::TransformStamped ee_pose;
+  get_ee_trans(ee_pose);
   geometry_msgs::msg::PoseStamped ee_pose_msg;
   ee_pose_msg.header.stamp = ee_pose.header.stamp;
   ee_pose_msg.header.frame_id = base_link_name_;
-  ee_pose_msg.pose.position = vector3ToPoint(ee_pose.transform.translation);
+  ee_pose_msg.pose.position = vector3_to_point(ee_pose.transform.translation);
   ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
   current_frame_pub_->publish(ee_pose_msg);
 
@@ -544,7 +543,7 @@ int main(int argc, char **argv) {
   auto node = std::make_shared<HapticControlBase>();
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Calling impedance service:");
   if (node->use_fixtures_) {
-    node->InitVFEnforcer();
+    node->init_vf_enforcer();
   }
   node->call_impedance_service();
   rclcpp::spin(node);

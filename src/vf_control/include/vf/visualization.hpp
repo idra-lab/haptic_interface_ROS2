@@ -14,7 +14,7 @@ class Visualizer {
   std::string reference_frame_;
   double plane_size_;
 
-  void InitMsg(visualization_msgs::msg::Marker &marker) {
+  void init_msg(visualization_msgs::msg::Marker &marker) {
     marker.header.frame_id = reference_frame_;
     marker.header.stamp = node_->now();
     marker.id = 0;
@@ -33,10 +33,10 @@ class Visualizer {
     marker.color.a = 1.0;
     marker.pose.orientation.w = 1.0;
   }
-  void AddMesh(std::string path, int id) {
+  void add_mesh(std::string path, int id) {
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
-    InitMsg(marker);
+    init_msg(marker);
     marker.id = id;
     marker.ns = "mesh";
     marker.mesh_resource = "file://" + path;
@@ -47,8 +47,8 @@ class Visualizer {
       rclcpp::sleep_for(100ms);
     }
   }
-  void AddPatientMesh(std::string output_mesh_path,
-                      std::string skin_mesh_path) {
+  void add_patient_mesh(std::string output_mesh_path,
+                        std::string skin_mesh_path) {
     RCLCPP_INFO_STREAM(node_->get_logger(),
                        "Adding rib case mesh with path: " << output_mesh_path);
     RCLCPP_INFO_STREAM(node_->get_logger(),
@@ -56,7 +56,7 @@ class Visualizer {
 
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
-    InitMsg(marker);
+    init_msg(marker);
     marker.ns = "patient";
     // add skin mesh
     marker.id = 0;
@@ -76,12 +76,12 @@ class Visualizer {
     }
     RCLCPP_INFO(node_->get_logger(), "Mesh visualization completed");
   }
-  void DrawClosestPoints(
+  void draw_closest_points(
       std::unordered_map<int, std::pair<Eigen::Vector3d, Location>> &points,
       double radius) {
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
-    InitMsg(marker);
+    init_msg(marker);
     marker.ns = "CP";
     marker.action = visualization_msgs::msg::Marker::DELETEALL;
     marker_array.markers.push_back(marker);
@@ -118,10 +118,10 @@ class Visualizer {
     marker_pub_->publish(marker_array);
   }
 
-  void UpdateScene(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>
-                       constraint_planes,
-                   Eigen::Vector3d target, Eigen::Vector3d vf_pose,
-                   double radius) {
+  void update_scene(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>
+                        constraint_planes,
+                    Eigen::Vector3d target, Eigen::Vector3d vf_pose,
+                    double radius) {
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
     marker.header.frame_id = reference_frame_;

@@ -15,4 +15,21 @@ jobs:
       - run: sudo apt-get install -y libpciaccess-dev libomp-dev
       - uses: ros-tooling/action-ros-ci@v0.3
         with:
+          package-name: test_calibration
           target-ros2-distro: humble
+          skip-tests: true
+      - uses: ros-tooling/action-ros-ci@v0.3
+        with:
+          package-name: test_admittance
+          target-ros2-distro: humble
+          skip-tests: true
+      - uses: ros-tooling/action-ros-ci@v0.3
+        with:
+          package-name: test_impedance
+          target-ros2-distro: humble
+          skip-tests: true
+      - uses: ros-tooling/action-ros-ci@v0.3
+        with:
+          package-name: haptic_control
+          target-ros2-distro: humble
+          skip-tests: true

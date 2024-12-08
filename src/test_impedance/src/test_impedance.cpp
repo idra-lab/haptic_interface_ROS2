@@ -52,7 +52,7 @@ class TestImpedance : public rclcpp::Node {
         "virtuose_impedance");
 
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Calling impedance service:");
-    call_impedance_service();
+    callImpedanceService();
   }
 
  private:
@@ -86,7 +86,7 @@ class TestImpedance : public rclcpp::Node {
     status_button = msg->buttons;
   }
 
-  void call_impedance_service() {
+  void callImpedanceService() {
     // Request impedance mode
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending impedance request");
 

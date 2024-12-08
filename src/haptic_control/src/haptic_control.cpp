@@ -254,7 +254,7 @@ void HapticControl::out_virtuose_statusCB(
   status_button_ = msg->buttons;
 }
 
-void HapticControl::call_impedance_service() {
+void HapticControl::callImpedanceService() {
   received_ee_pose_ = false;
   while (!received_ee_pose_) {
     try {
@@ -444,7 +444,7 @@ void HapticControl::impedanceThread() {
                          target_position_vec.norm(), safety_sphere_radius_);
     if (target_position_vec.norm() > safety_sphere_radius_) {
       // project the target on the safety sphere to prevent singularities
-      project_target_on_sphere(target_position_vec, safety_sphere_radius_);
+      projectTargetOnSphere(target_position_vec, safety_sphere_radius_);
     } else {
       // update the old pose only if the target is within the safety sphere
       x_tilde_old_ = x_tilde_new_;
@@ -485,8 +485,8 @@ void HapticControl::impedanceThread() {
   tf_broadcaster_->sendTransform(target_pose_tf_);
   target_pos_publisher_->publish(target_pose_);
 }
-void HapticControl::project_target_on_sphere(
-    Eigen::Vector3d &target_position_vec, double safety_sphere_radius_) {
+void HapticControl::projectTargetOnSphere(Eigen::Vector3d &target_position_vec,
+                                          double safety_sphere_radius_) {
   target_position_vec =
       target_position_vec.normalized() * safety_sphere_radius_;
 }
@@ -498,7 +498,7 @@ int main(int argc, char **argv) {
 
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Calling impedance service:");
 
-  node->call_impedance_service();
+  node->callImpedanceService();
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

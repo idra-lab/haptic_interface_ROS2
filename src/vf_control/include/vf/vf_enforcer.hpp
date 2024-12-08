@@ -50,9 +50,9 @@ class VFEnforcer {
     }
     open3d::io::WriteTriangleMesh(output_mesh_path_, *o3d_mesh);
     if (mesh_type_ == "file") {
-      visualizer_->AddPatientMesh(output_mesh_path_, skin_mesh_path_);
+      visualizer_->add_patient_mesh(output_mesh_path_, skin_mesh_path_);
     } else {
-      visualizer_->AddMesh(output_mesh_path_, 0);
+      visualizer_->add_mesh(output_mesh_path_, 0);
     }
     RCLCPP_INFO_STREAM(node->get_logger(),
                        "Loaded mesh with "
@@ -82,10 +82,10 @@ class VFEnforcer {
     this->x_des_old = x_des;
     this->delta_x_ << 0, 0, 0;
 
-    visualizer_->UpdateScene(constraint_planes_, x_des, x_old_, radius_);
+    visualizer_->update_scene(constraint_planes_, x_des, x_old_, radius_);
   }
 
-  Eigen::Vector3d EnforceVF(Eigen::Vector3d x_des) {
+  Eigen::Vector3d enforce_vf(Eigen::Vector3d x_des) {
     if ((x_des - x_des_old).norm() < 0.0005) {
       // return last delta_x_
       return Eigen::Vector3d(0, 0, 0);
@@ -103,7 +103,7 @@ class VFEnforcer {
     target_pose_vf.pose.position.y = x_new[1];
     target_pose_vf.pose.position.z = x_new[2];
     target_pose_vf.pose.orientation.w = 1.0;
-    visualizer_->UpdateScene(constraint_planes_, x_des, x_new, radius_);
+    visualizer_->update_scene(constraint_planes_, x_des, x_new, radius_);
     return delta_x_;
   }
 

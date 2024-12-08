@@ -10,7 +10,7 @@ enum class Location {
   V1V3 = 5,
   V2V3 = 6
 };
-const inline char* LocationToString(Location l) {
+const inline char* location_to_string(Location l) {
   switch (l) {
     case Location::VOID:
       return "VOID";
@@ -32,7 +32,7 @@ const inline char* LocationToString(Location l) {
       return "INVALID";
   }
 };
-inline Location intToLocation(int i) {
+inline Location int_to_location(int i) {
   switch (i) {
     case -1:
       return Location::VOID;

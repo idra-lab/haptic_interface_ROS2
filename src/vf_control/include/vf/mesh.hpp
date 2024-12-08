@@ -80,7 +80,7 @@ class Mesh {
       triangle_xfm_inv[i] = triangle_xfm[i].inverse();
     }
   }
-  void extrudeMeshRadially(const Eigen::Vector3d &origin, const double scale) {
+  void extrude_radially(const Eigen::Vector3d &origin, const double scale) {
     (void)origin;
     // find the faces with no neighbors
     std::vector<int> border_faces;
@@ -95,23 +95,26 @@ class Mesh {
 
       if (adjacency_dict.at({i, Location::V1V2}).size() == 0) {
         std::cout << "Extruding face " << i << " along V1V2" << std::endl;
-        extrudeEdgeAlongDirection(faces[i][0], faces[i][1], direction, scale);
+        extrude_edge_along_direction(faces[i][0], faces[i][1], direction,
+                                     scale);
       }
       if (adjacency_dict.at({i, Location::V2V3}).size() == 0) {
         std::cout << "Extruding face " << i << " along V2V3" << std::endl;
-        extrudeEdgeAlongDirection(faces[i][1], faces[i][2], direction, scale);
+        extrude_edge_along_direction(faces[i][1], faces[i][2], direction,
+                                     scale);
       }
       if (adjacency_dict.at({i, Location::V1V3}).size() == 0) {
         std::cout << "Extruding face " << i << " along V1V3" << std::endl;
-        extrudeEdgeAlongDirection(faces[i][0], faces[i][2], direction, scale);
+        extrude_edge_along_direction(faces[i][0], faces[i][2], direction,
+                                     scale);
       }
     }
     std::cout << "Face before extrusion: " << num_faces << std::endl;
     std::cout << "Face after extrusion: " << faces.size() << std::endl;
   }
-  void extrudeEdgeAlongDirection(const int v1, const int v2,
-                                 const Eigen::Vector3d &direction,
-                                 const double scale) {
+  void extrude_edge_along_direction(const int v1, const int v2,
+                                    const Eigen::Vector3d &direction,
+                                    const double scale) {
     // extrude the border faces
     const Eigen::Vector3d v1_ = vertices[v1];
     const Eigen::Vector3d v2_ = vertices[v2];

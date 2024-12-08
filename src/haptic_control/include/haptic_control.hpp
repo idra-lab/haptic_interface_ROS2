@@ -3,8 +3,8 @@
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
-#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 
 #include <Eigen/Core>
@@ -34,7 +34,7 @@ using std::placeholders::_2;
 using namespace std::chrono_literals;
 
 class HapticControl : public rclcpp::Node {
-public:
+ public:
   HapticControl(const std::string &name = "haptic_control",
                 const std::string &namespace_ = "",
                 const rclcpp::NodeOptions &options =
@@ -53,12 +53,12 @@ public:
       const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg);
   void out_virtuose_statusCB(
       const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg);
-  void call_impedance_service();
+  void callImpedanceService();
   void impedanceThread();
-  void project_target_on_sphere(Eigen::Vector3d &target_position_vec,
-                                double safety_sphere_radius_);
+  void projectTargetOnSphere(Eigen::Vector3d &target_position_vec,
+                             double safety_sphere_radius_);
 
-private:
+ private:
   // ROS2 subscribtions
   rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuoseStatus>::SharedPtr
       out_virtuose_status_;
@@ -131,4 +131,4 @@ private:
   Eigen::Vector3d x_tilde_old_, x_tilde_new_;
 };
 
-#endif // HAPTIC_CONTROL_HPP
+#endif  // HAPTIC_CONTROL_HPP

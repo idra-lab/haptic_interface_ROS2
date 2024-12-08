@@ -30,7 +30,7 @@
 #include "tf2_ros/transform_broadcaster.h"
 
 #include "utils.hpp"
-#include "vf_enforcer.hpp"
+#include "vf/vf_enforcer.hpp"
 
 class HapticControlBase : public rclcpp::Node {
  public:
@@ -48,15 +48,15 @@ class HapticControlBase : public rclcpp::Node {
   void set_safety_box_length_CB(const rclcpp::Parameter &p);
   void set_safety_box_height_CB(const rclcpp::Parameter &p);
   void update_current_ee_pos();
-  void SetWrenchCB(const geometry_msgs::msg::WrenchStamped target_wrench);
+  void set_wrench(const geometry_msgs::msg::WrenchStamped target_wrench);
   void out_virtuose_pose_CB(
       const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg);
   void out_virtuose_statusCB(
       const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg);
   void call_impedance_service();
-  void impedanceThread();
-  geometry_msgs::msg::TransformStamped getEndEffectorTransform();
-  void InitVFEnforcer();
+  void impedance_thread();
+  void get_ee_trans(geometry_msgs::msg::TransformStamped &trans);
+  void init_vf_enforcer();
   void project_target_on_sphere(Eigen::Vector3d &target_position_vec,
                                 double safety_sphere_radius_);
   geometry_msgs::msg::TransformStamped target_pose_tf_;

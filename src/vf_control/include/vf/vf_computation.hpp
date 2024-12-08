@@ -6,18 +6,18 @@
 
 namespace compute_vf {
 template <typename Scalar>
-inline bool AlmostEqual(const Eigen::Matrix<Scalar, 3, 1> &vec1,
-                        const Eigen::Matrix<Scalar, 3, 1> &vec2,
-                        Scalar tolerance = static_cast<Scalar>(1e-6)) {
+inline bool almost_equal(const Eigen::Matrix<Scalar, 3, 1> &vec1,
+                         const Eigen::Matrix<Scalar, 3, 1> &vec2,
+                         Scalar tolerance = static_cast<Scalar>(1e-6)) {
   // Calculate the angle between the two vectors
   Scalar dotProduct = vec1.normalized().dot(vec2.normalized());
   Scalar angle = std::acos(dotProduct);
 
   // Calculate the axis difference (check if the vectors are almost parallel)
-  bool axisAlmostEqual =
+  bool axisalmost_equal =
       vec1.normalized().isApprox(vec2.normalized(), tolerance);
 
-  return ((angle <= tolerance) && axisAlmostEqual);
+  return ((angle <= tolerance) && axisalmost_equal);
 }
 
 Eigen::Vector3d enforce_virtual_fixture(
@@ -47,7 +47,7 @@ Eigen::Vector3d enforce_virtual_fixture(
   for (int Ti : T) {
     CP[Ti] = mesh.get_closest_on_triangle(current_position, Ti);
   }
-  // vis.DrawClosestPoints(CP, 0.002);
+  // vis.draw_closest_points(CP, 0.002);
   int iteration = 0;
   for (auto it = T.begin(); it != T.end();) {
     // std::cout << "-----\nIteration: " << iteration++ << std::endl;
@@ -66,11 +66,11 @@ Eigen::Vector3d enforce_virtual_fixture(
       if (cpi_loc == Location::V1 || cpi_loc == Location::V2 ||
           cpi_loc == Location::V3 || cpi_loc == Location::VOID) {
         // Constraint plane is the tangent plane to the sphere
-        if (AlmostEqual(current_position, CPi, eps)) {
+        if (almost_equal(current_position, CPi, eps)) {
           Eigen::Vector3d n = mesh.normals[*it].normalized();
           for (auto j = it + 1; j != T.end();) {
             auto [CPj, cpj_loc] = CP.at(*j);
-            if (AlmostEqual(CPi, CPj, eps) &&
+            if (almost_equal(CPi, CPj, eps) &&
                 mesh.is_locally_concave(*it, *j, cpi_loc)) {
               n += mesh.normals[*j].normalized();
               T.erase(j);
@@ -110,7 +110,7 @@ Eigen::Vector3d enforce_virtual_fixture(
 
           if (neighborIdxList1.size() > 0) {
             neighborIdx1 = neighborIdxList1[0];
-            if (AlmostEqual(CPi, CPn1, eps)) {
+            if (almost_equal(CPi, CPn1, eps)) {
               for (auto j = it + 1; j != T.end();) {
                 if (*j == neighborIdx1) {
                   T.erase(j);
@@ -125,7 +125,7 @@ Eigen::Vector3d enforce_virtual_fixture(
           }
           if (neighborIdxList2.size() > 0) {
             neighborIdx2 = neighborIdxList2[0];
-            if (AlmostEqual(CPi, CPn2, eps)) {
+            if (almost_equal(CPi, CPn2, eps)) {
               for (auto j = it + 1; j != T.end();) {
                 if (*j == neighborIdx2) {
                   T.erase(j);
@@ -157,8 +157,8 @@ Eigen::Vector3d enforce_virtual_fixture(
           }
           auto [CPia, cpia_loc] = CP.at(neighborIdx);
           if (mesh.is_locally_concave(Ti, neighborIdx, cpi_loc)) {
-            if (AlmostEqual(CPia, CPi, eps)) {
-              if (AlmostEqual(current_position, CPi, eps)) {
+            if (almost_equal(CPia, CPi, eps)) {
+              if (almost_equal(current_position, CPi, eps)) {
                 Eigen::Vector3d n =
                     (Ni + mesh.normals[neighborIdx].normalized()).normalized();
                 constraint_planes.push_back({n, CPi});

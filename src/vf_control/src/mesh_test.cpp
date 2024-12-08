@@ -1,11 +1,11 @@
-#include "mesh.hpp"
 
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "location.hpp"
 #include "open3d/Open3D.h"
+#include "vf/location.hpp"
+#include "vf/mesh.hpp"
 
 void testFindNearest() {
   auto o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 40);
@@ -36,7 +36,8 @@ void testClosestOnTriangle() {
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 1" << std::endl
             << closestPoint.first
-            << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
+            << "\n Loc: " << location_to_string(closestPoint.second)
+            << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
   // Test Case 2: Point at vertex P2
@@ -45,7 +46,8 @@ void testClosestOnTriangle() {
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 2" << std::endl
             << closestPoint.first
-            << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
+            << "\n Loc: " << location_to_string(closestPoint.second)
+            << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
   // Test Case 3: Point at vertex P3
@@ -54,7 +56,8 @@ void testClosestOnTriangle() {
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 3" << std::endl
             << closestPoint.first
-            << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
+            << "\n Loc: " << location_to_string(closestPoint.second)
+            << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
   // Test Case 4: Point inside triangle
@@ -63,7 +66,8 @@ void testClosestOnTriangle() {
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 4" << std::endl
             << closestPoint.first
-            << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
+            << "\n Loc: " << location_to_string(closestPoint.second)
+            << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
   // Test Case 5: Point on edge P1P3 but not at vertices
@@ -72,7 +76,8 @@ void testClosestOnTriangle() {
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 5" << std::endl
             << closestPoint.first
-            << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
+            << "\n Loc: " << location_to_string(closestPoint.second)
+            << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
   // Test Case 6: Point on edge P1P3 but not at vertices
@@ -81,7 +86,8 @@ void testClosestOnTriangle() {
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 6" << std::endl
             << closestPoint.first
-            << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
+            << "\n Loc: " << location_to_string(closestPoint.second)
+            << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
   // Test Case 7: Point inside triangle
@@ -90,7 +96,8 @@ void testClosestOnTriangle() {
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 7" << std::endl
             << closestPoint.first
-            << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
+            << "\n Loc: " << location_to_string(closestPoint.second)
+            << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
   // Test Case 7: Point inside triangle
@@ -99,7 +106,8 @@ void testClosestOnTriangle() {
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 8" << std::endl
             << closestPoint.first
-            << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
+            << "\n Loc: " << location_to_string(closestPoint.second)
+            << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
   point << -0.5, -1.5, 0.0;
@@ -107,7 +115,8 @@ void testClosestOnTriangle() {
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 9" << std::endl
             << closestPoint.first
-            << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
+            << "\n Loc: " << location_to_string(closestPoint.second)
+            << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
   // Try with mesh
@@ -129,7 +138,7 @@ void testClosestOnTriangle() {
 
   auto [CPi, loc] = findClosestPointOnTriangle(point, xfm, xfm_inv, V1, V2, V3);
   std::cout << "CPI: \n"
-            << CPi << "\n Loc: " << LocationToString(loc) << std::endl;
+            << CPi << "\n Loc: " << location_to_string(loc) << std::endl;
 }
 void colorMeshFacesNew(open3d::t::geometry::TriangleMesh &mesh_new, int faceIdx,
                        std::vector<int> adjacent_faces) {
@@ -209,8 +218,10 @@ void testAdjacencyList() {
         geometries.push_back(sphere_face);
         std::cout << "Retrieving neighbors for face " << face_idx
                   << " at location "
-                  << LocationToString(static_cast<Location>(loc)) << std::endl;
-        auto neighbors = mesh.adjacency_dict.at({face_idx, intToLocation(loc)});
+                  << location_to_string(static_cast<Location>(loc))
+                  << std::endl;
+        auto neighbors =
+            mesh.adjacency_dict.at({face_idx, int_to_location(loc)});
         std::cout << "Face " << face_idx << " has neighbors: \n";
         geometries.push_back(o3d_mesh);
         for (auto neighbor : neighbors) {
@@ -241,7 +252,7 @@ void testExtrusion() {
   o3d_mesh->ComputeTriangleNormals();
   Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_,
             o3d_mesh->vertex_normals_);
-  mesh.extrudeMeshRadially(Eigen::Vector3d(0, 0, 0), 0.05);
+  mesh.extrude_radially(Eigen::Vector3d(0, 0, 0), 0.05);
   auto o3d_mesh_extruded = std::make_shared<open3d::geometry::TriangleMesh>();
   o3d_mesh_extruded->vertices_ = mesh.vertices;
   o3d_mesh_extruded->triangles_ = mesh.faces;
