@@ -2,6 +2,7 @@
 #define VF_COMPUTATION_HPP
 #define DEBUG true
 #include "qp_wrapper.hpp"
+#include "visualization.hpp"
 
 namespace compute_vf {
 template <typename Scalar>
