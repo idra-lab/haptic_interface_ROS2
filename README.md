@@ -1,3 +1,6 @@
+[![Humble CI](https://github.com/idra-lab/haptic_interface_ROS2/actions/workflows/main.yml/badge.svg)](https://github.com/idra-lab/haptic_interface_ROS2/actions/workflows/main.yml)  
+
+
 *The following instructions are the one that were distribuited with the vendor's code with some clarifications. You must follow the instruction in the haptic documentation first (having the right files under /etc/Haption/). Documentation and libraries are [here](https://drive.google.com/drive/folders/1g4NHb75PtUcHunHAImuzkCfoDhdFXWoR?usp=drive_link). The binaries and the headers are already in the correct folder so ***you do not need to follow point #2***. Also you can avoid points #0 and #4 by running the 'entrypoint.sh'*
 
 This project includes a basic implementation of the test programs (TestCalibration, TestImpedance and TestAdmittance) distribuited with the haptic interface and the IDRA team's implementation for the teleoperation (under `haptic_control`) using ROS2 and RaptorAPI.

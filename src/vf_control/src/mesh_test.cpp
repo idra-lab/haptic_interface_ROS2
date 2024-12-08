@@ -233,9 +233,10 @@ void testAdjacencyList() {
     }
   }
 }
-void testExtrusion(){
+void testExtrusion() {
   auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-  open3d::io::ReadTriangleMesh("/home/nardi/SKEL_WS/ros2_ws/projected_skel.obj", *o3d_mesh);
+  open3d::io::ReadTriangleMesh("/home/nardi/SKEL_WS/ros2_ws/projected_skel.obj",
+                               *o3d_mesh);
   open3d::visualization::DrawGeometries({o3d_mesh});
   o3d_mesh->ComputeTriangleNormals();
   Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_,
@@ -246,8 +247,6 @@ void testExtrusion(){
   o3d_mesh_extruded->triangles_ = mesh.faces;
   o3d_mesh_extruded->ComputeTriangleNormals();
   open3d::visualization::DrawGeometries({o3d_mesh_extruded});
-
-
 }
 int main() {
   // testFindNearest();

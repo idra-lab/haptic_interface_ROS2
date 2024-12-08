@@ -24,9 +24,12 @@ HapticControl::HapticControl(const std::string &name,
   // safety box dimension
   this->enable_safety_box_ = this->get_parameter("enable_safety_box").as_bool();
   if (this->enable_safety_box_) {
-    this->safety_box_width_ = this->get_parameter("safety_box_width").as_double();   // x
-    this->safety_box_length_ = this->get_parameter("safety_box_length").as_double(); // y
-    this->safety_box_height_ = this->get_parameter("safety_box_height").as_double(); // z
+    this->safety_box_width_ =
+        this->get_parameter("safety_box_width").as_double();  // x
+    this->safety_box_length_ =
+        this->get_parameter("safety_box_length").as_double();  // y
+    this->safety_box_height_ =
+        this->get_parameter("safety_box_height").as_double();  // z
   } else {
     this->safety_box_width_ = std::numeric_limits<double>::infinity();
     this->safety_box_length_ = std::numeric_limits<double>::infinity();
@@ -67,8 +70,8 @@ HapticControl::HapticControl(const std::string &name,
       this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame",
                                                               1);
   current_target_pos_publisher_ =
-      this->create_publisher<geometry_msgs::msg::PoseStamped>("/target_frame_vf",
-                                                              1);
+      this->create_publisher<geometry_msgs::msg::PoseStamped>(
+          "/target_frame_vf", 1);
 
   _in_virtuose_force =
       this->create_publisher<raptor_api_interfaces::msg::InVirtuoseForce>(
@@ -87,12 +90,13 @@ HapticControl::HapticControl(const std::string &name,
       "enable_safety_sphere", std::bind(&HapticControl::enable_safety_sphere_CB,
                                         this, std::placeholders::_1));
   cb_safety_sphere_radius_ = param_subscriber_->add_parameter_callback(
-      "safety_sphere_radius", std::bind(&HapticControl::set_safety_sphere_radius_CB,
-                                  this, std::placeholders::_1));
+      "safety_sphere_radius",
+      std::bind(&HapticControl::set_safety_sphere_radius_CB, this,
+                std::placeholders::_1));
   // Safety box
   cb_enable_safety_box_ = param_subscriber_->add_parameter_callback(
-      "enable_safety_box", std::bind(&HapticControl::enable_safety_box_CB,
-                                        this, std::placeholders::_1));
+      "enable_safety_box", std::bind(&HapticControl::enable_safety_box_CB, this,
+                                     std::placeholders::_1));
   cb_safety_box_width_ = param_subscriber_->add_parameter_callback(
       "safety_box_width", std::bind(&HapticControl::set_safety_box_width_CB,
                                     this, std::placeholders::_1));
@@ -101,8 +105,7 @@ HapticControl::HapticControl(const std::string &name,
                                      this, std::placeholders::_1));
   cb_safety_box_height_ = param_subscriber_->add_parameter_callback(
       "safety_box_height", std::bind(&HapticControl::set_safety_box_height_CB,
-                                     this, std::placeholders::_1));                                     
-
+                                     this, std::placeholders::_1));
 
   received_haptic_pose_ = false;
 
@@ -376,14 +379,14 @@ void HapticControl::impedanceThread() {
              (1 - alpha) * current_wrench_.wrench.force.z);
   // torque omitted for control simplicity
   force.virtuose_force.torque.x =
-      0.0; // 0.2 * (alpha * old_force_.virtuose_force.torque.x + (1 - alpha)
-           // * current_wrench_.wrench.torque.x);
+      0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.x + (1 - alpha)
+            // * current_wrench_.wrench.torque.x);
   force.virtuose_force.torque.y =
-      0.0; // 0.2 * (alpha * old_force_.virtuose_force.torque.y + (1 - alpha)
-           // * current_wrench_.wrench.torque.y);
+      0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.y + (1 - alpha)
+            // * current_wrench_.wrench.torque.y);
   force.virtuose_force.torque.z =
-      0.0; // 0.2 * (alpha * old_force_.virtuose_force.torque.z + (1 - alpha)
-           // * current_wrench_.wrench.torque.z);
+      0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.z + (1 - alpha)
+            // * current_wrench_.wrench.torque.z);
 
   // SAFE ZONE FORCE
 
@@ -415,7 +418,8 @@ void HapticControl::impedanceThread() {
 
   // Publish target position
   target_pose_.header.stamp = target_pose_tf_.header.stamp = get_clock()->now();
-  target_pose_.header.frame_id = target_pose_tf_.header.frame_id = base_link_name_;
+  target_pose_.header.frame_id = target_pose_tf_.header.frame_id =
+      base_link_name_;
   target_pose_tf_.child_frame_id = "haptic_interface_target";
 
   // computing error
@@ -468,10 +472,14 @@ void HapticControl::impedanceThread() {
   Eigen::Quaterniond qTarget = qDiff * qEEStart;
   qTarget.normalize();
 
-  target_pose_.pose.orientation.x = target_pose_tf_.transform.rotation.x = qTarget.x();
-  target_pose_.pose.orientation.y = target_pose_tf_.transform.rotation.y = qTarget.y();
-  target_pose_.pose.orientation.z = target_pose_tf_.transform.rotation.z = qTarget.z();
-  target_pose_.pose.orientation.w = target_pose_tf_.transform.rotation.w = qTarget.w();
+  target_pose_.pose.orientation.x = target_pose_tf_.transform.rotation.x =
+      qTarget.x();
+  target_pose_.pose.orientation.y = target_pose_tf_.transform.rotation.y =
+      qTarget.y();
+  target_pose_.pose.orientation.z = target_pose_tf_.transform.rotation.z =
+      qTarget.z();
+  target_pose_.pose.orientation.w = target_pose_tf_.transform.rotation.w =
+      qTarget.w();
 
   // send trasnform and publish target pose
   tf_broadcaster_->sendTransform(target_pose_tf_);

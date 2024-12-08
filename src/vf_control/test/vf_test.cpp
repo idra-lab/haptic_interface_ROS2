@@ -9,19 +9,18 @@
 #include "location.hpp"
 #include "open3d/Open3D.h"
 
-TEST(vf_control, testFindNearest)
-{
+TEST(vf_control, testFindNearest) {
   auto o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 40);
   Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_,
             o3d_mesh->vertex_normals_);
-  Eigen::Vector3d point(1.0,0.0,0.0);
+  Eigen::Vector3d point(1.0, 0.0, 0.0);
   std::vector<int> nearest;
   mesh.find_nearby_triangles(point, 0.9, nearest);
   EXPECT_EQ(nearest.size(), 1074);
   mesh.find_nearby_triangles(point, 0.1, nearest);
   EXPECT_EQ(nearest.size(), 0);
 }
-TEST(vf_control,testClosestOnTriangle) {
+TEST(vf_control, testClosestOnTriangle) {
   // Test Case 1: Point at vertex P1
   Eigen::Vector3d point(0.0, 0.0, 0.0);
   Eigen::Vector3d P1(0.0, 0.0, 0.0);
@@ -35,7 +34,6 @@ TEST(vf_control,testClosestOnTriangle) {
             << triXfmInv << std::endl;
   EXPECT_EQ(triXfm, Eigen::Matrix4d::Identity());
 
-
   std::pair<Eigen::Vector3d, Location> closestPoint =
       findClosestPointOnTriangle(point, triXfm, triXfmInv, P1, P2, P3);
   std::cout << "Test 1" << std::endl
@@ -43,7 +41,7 @@ TEST(vf_control,testClosestOnTriangle) {
             << "\n Loc: " << LocationToString(closestPoint.second) << std::endl;
   std::cout << "-----------------------------------" << std::endl;
 
-   EXPECT_EQ(triXfm, Eigen::Matrix4d::Identity());
+  EXPECT_EQ(triXfm, Eigen::Matrix4d::Identity());
 
   // Test Case 2: Point at vertex P2
   point << 1.0, 0.0, 0.0;
@@ -239,9 +237,10 @@ void testAdjacencyList() {
     }
   }
 }
-void testExtrusion(){
+void testExtrusion() {
   auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-  open3d::io::ReadTriangleMesh("/home/nardi/SKEL_WS/ros2_ws/projected_skel.obj", *o3d_mesh);
+  open3d::io::ReadTriangleMesh("/home/nardi/SKEL_WS/ros2_ws/projected_skel.obj",
+                               *o3d_mesh);
   open3d::visualization::DrawGeometries({o3d_mesh});
   o3d_mesh->ComputeTriangleNormals();
   Mesh mesh(o3d_mesh->vertices_, o3d_mesh->triangles_,
@@ -252,10 +251,8 @@ void testExtrusion(){
   o3d_mesh_extruded->triangles_ = mesh.faces;
   o3d_mesh_extruded->ComputeTriangleNormals();
   open3d::visualization::DrawGeometries({o3d_mesh_extruded});
-
-
 }
-int main(int argc, char ** argv) {
+int main(int argc, char **argv) {
   // testFindNearest();
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
