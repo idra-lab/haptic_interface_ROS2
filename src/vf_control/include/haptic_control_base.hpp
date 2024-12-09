@@ -33,17 +33,20 @@ class HapticControlBase : public rclcpp::Node {
           rclcpp::NodeOptions()
               .allow_undeclared_parameters(true)
               .automatically_declare_parameters_from_overrides(true));
+  // safe sphere virtual fixture
   void enable_safety_sphere_CB(const rclcpp::Parameter &p);
   void set_safety_sphere_radius_CB(const rclcpp::Parameter &p);
+  // safe box virtual fixture
   void enable_safety_box_CB(const rclcpp::Parameter &p);
   void set_safety_box_width_CB(const rclcpp::Parameter &p);
   void set_safety_box_length_CB(const rclcpp::Parameter &p);
   void set_safety_box_height_CB(const rclcpp::Parameter &p);
+
   void update_current_ee_pos();
   void store_wrench(const geometry_msgs::msg::WrenchStamped target_wrench);
   Eigen::Vector3d compute_position_error();
   Eigen::Quaterniond compute_orientation_error();
-  void initialize();
+  void initialize_haptic_control();
   void control_thread();
   void get_ee_trans(geometry_msgs::msg::TransformStamped &trans);
   void init_vf_enforcer();
@@ -100,13 +103,6 @@ class HapticControlBase : public rclcpp::Node {
   double delay_;
 
   // Storage for virtuose_node status
-  int64_t status_date_sec_;
-  uint32_t status_date_nanosec_;
-  int client__id_;
-  int ctr_;
-  // Storage for virtuose pose
-  //   int64_t pose_date_sec_;
-  //   uint32_t pose_date_nanosec_;
   std::array<double, 7> cur_pose_;
   std::array<double, 3> bounding_box_center_;
   uint32_t status_state_;
@@ -118,7 +114,7 @@ class HapticControlBase : public rclcpp::Node {
 
   std::shared_ptr<VFEnforcer> vf_enforcer_;
   // ros control_thread_
-    rclcpp::TimerBase::SharedPtr control_thread_;
+  rclcpp::TimerBase::SharedPtr control_thread_;
 };
 
 #endif  // __HAPTIC_CONTROL_BASE__

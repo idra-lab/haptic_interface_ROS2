@@ -1,7 +1,7 @@
 #ifndef __SYSTEM_INTERFACE_HPP__
 #define __SYSTEM_INTERFACE_HPP__
 // this is the class that controls the haptic interface using its API,
-// you can redefine it to adapt the library to your device
+// you can redefine it to adapt the library to your device.
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -31,19 +31,12 @@ class SystemInterface : public rclcpp::Node {
               .automatically_declare_parameters_from_overrides(true))
       : Node(name, namespace_, options),
         q_haptic_base_to_robot_base_(q_haptic_base_to_robot_base) {
-    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preparing publishers");
-    out_virtuose_status_ = this->create_subscription<
-        raptor_api_interfaces::msg::OutVirtuoseStatus>(
-        "out_virtuose_status", 1,
-        std::bind(&SystemInterface::out_virtuose_statusCB, this,
-                  std::placeholders::_1));
-    _out_virtuose_pose_ =
+    pose_subscriber_ =
         this->create_subscription<raptor_api_interfaces::msg::OutVirtuosePose>(
             "out_virtuose_pose", 1,
-            std::bind(&SystemInterface::out_virtuose_pose_CB, this,
+            std::bind(&SystemInterface::store_pose, this,
                       std::placeholders::_1));
-
-    _in_virtuose_force =
+    wrench_publisher_ =
         this->create_publisher<raptor_api_interfaces::msg::InVirtuoseForce>(
             "in_virtuose_force", 1);
     impedance_client_ =
@@ -100,8 +93,6 @@ class SystemInterface : public rclcpp::Node {
                    "Failed to call service impedance, client__id_ is zero!");
       return;
     }
-
-    ctr_ = 0;
   }
 
   void apply_target_wrench(geometry_msgs::msg::WrenchStamped target_wrench) {
@@ -125,7 +116,6 @@ class SystemInterface : public rclcpp::Node {
     force_.virtuose_force.torque.z = 0.0;
 
     // SAFE ZONE FORCE
-
     force_.virtuose_force.force.x =
         std::clamp(force_.virtuose_force.force.x, -max_force_, max_force_);
     force_.virtuose_force.force.y =
@@ -141,35 +131,13 @@ class SystemInterface : public rclcpp::Node {
     old_force_.virtuose_force.torque.y = force_.virtuose_force.torque.y;
     old_force_.virtuose_force.torque.z = force_.virtuose_force.torque.z;
 
-    _in_virtuose_force->publish(force_);
-    ctr_++;
+    wrench_publisher_->publish(force_);
   }
 
-  geometry_msgs::msg::PoseStamped haptic_starting_pose_, haptic_current_pose_;
-  bool received_haptic_pose_ = false;
-
- private:
-  raptor_api_interfaces::msg::InVirtuoseForce force_;
-  raptor_api_interfaces::msg::InVirtuoseForce old_force_;
-  int client__id_, ctr_ = 0;
-  const double alpha_ = 0.0;
-  const double scale_ = 0.3;
-  const double max_force_ = 6.0;
-  Eigen::Quaterniond q_haptic_base_to_robot_base_;
-
-  rclcpp::Publisher<raptor_api_interfaces::msg::InVirtuoseForce>::SharedPtr
-      _in_virtuose_force;
-  rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuoseStatus>::SharedPtr
-      out_virtuose_status_;
-  rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuosePose>::SharedPtr
-      _out_virtuose_pose_;
-  rclcpp::Client<raptor_api_interfaces::srv::VirtuoseImpedance>::SharedPtr
-      impedance_client_;
-
-  void out_virtuose_pose_CB(
+  void store_pose(
       const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg) {
     if (!received_haptic_pose_) {
-      // Store last pose date
+      // Store the first pose received
       received_haptic_pose_ = true;
       haptic_starting_pose_.pose.position.x = msg->virtuose_pose.translation.x;
       haptic_starting_pose_.pose.position.y = msg->virtuose_pose.translation.y;
@@ -179,8 +147,6 @@ class SystemInterface : public rclcpp::Node {
       haptic_starting_pose_.pose.orientation.z = msg->virtuose_pose.rotation.z;
       haptic_starting_pose_.pose.orientation.w = msg->virtuose_pose.rotation.w;
     }
-    // pose_date_nanosec_ = msg->header.stamp.nanosec;
-    // pose_date_sec_ = msg->header.stamp.sec;
     haptic_current_pose_.pose.position.x = msg->virtuose_pose.translation.x;
     haptic_current_pose_.pose.position.y = msg->virtuose_pose.translation.y;
     haptic_current_pose_.pose.position.z = msg->virtuose_pose.translation.z;
@@ -188,18 +154,27 @@ class SystemInterface : public rclcpp::Node {
     haptic_current_pose_.pose.orientation.y = msg->virtuose_pose.rotation.y;
     haptic_current_pose_.pose.orientation.z = msg->virtuose_pose.rotation.z;
     haptic_current_pose_.pose.orientation.w = msg->virtuose_pose.rotation.w;
-
-    // ENFORCE SPHERE SAFETY
-    // TODO: implement safety sphere
-    // if (enable_safety_sphere_) {
-    //   x_tilde_new_ = x_tilde_old_ + (x_new_ - x_old_);
-    // } else {
-    //   x_tilde_new_ = x_new_;
-    // }
   }
-  void out_virtuose_statusCB(
-      const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg) {}
-  // thread
+
+  geometry_msgs::msg::PoseStamped haptic_starting_pose_, haptic_current_pose_;
+  bool received_haptic_pose_ = false;
+
+ private:
+  raptor_api_interfaces::msg::InVirtuoseForce force_;
+  raptor_api_interfaces::msg::InVirtuoseForce old_force_;
+  int client__id_ = 0;
+  const double alpha_ = 0.0;
+  const double scale_ = 0.3;
+  const double max_force_ = 6.0;
+  Eigen::Quaterniond q_haptic_base_to_robot_base_;
+
+  rclcpp::Publisher<raptor_api_interfaces::msg::InVirtuoseForce>::SharedPtr
+      wrench_publisher_;
+
+  rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuosePose>::SharedPtr
+      pose_subscriber_;
+  rclcpp::Client<raptor_api_interfaces::srv::VirtuoseImpedance>::SharedPtr
+      impedance_client_;
   rclcpp::TimerBase::SharedPtr impedanceThread_;
 };
 
