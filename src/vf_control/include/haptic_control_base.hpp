@@ -15,20 +15,12 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/wrench_stamped.hpp"
-#include "raptor_api_interfaces/msg/in_virtuose_force.hpp"
-#include "raptor_api_interfaces/msg/in_virtuose_pose.hpp"
-#include "raptor_api_interfaces/msg/in_virtuose_speed.hpp"
-#include "raptor_api_interfaces/msg/out_virtuose_force.hpp"
-#include "raptor_api_interfaces/msg/out_virtuose_physical_pose.hpp"
-#include "raptor_api_interfaces/msg/out_virtuose_pose.hpp"
-#include "raptor_api_interfaces/msg/out_virtuose_speed.hpp"
-#include "raptor_api_interfaces/msg/out_virtuose_status.hpp"
-#include "raptor_api_interfaces/srv/virtuose_impedance.hpp"
-#include "raptor_api_interfaces/srv/virtuose_reset.hpp"
+
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 
+#include "system_interface.hpp"
 #include "utils.hpp"
 #include "vf/vf_enforcer.hpp"
 
@@ -49,10 +41,7 @@ class HapticControlBase : public rclcpp::Node {
   void set_safety_box_height_CB(const rclcpp::Parameter &p);
   void update_current_ee_pos();
   void set_wrench(const geometry_msgs::msg::WrenchStamped target_wrench);
-  void out_virtuose_pose_CB(
-      const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg);
-  void out_virtuose_statusCB(
-      const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg);
+
   void call_impedance_service();
   void impedance_thread();
   void get_ee_trans(geometry_msgs::msg::TransformStamped &trans);
@@ -64,18 +53,11 @@ class HapticControlBase : public rclcpp::Node {
       old_target_pose_vf_;
   std::string base_link_name_;
   bool use_fixtures_ = true;
+  std::shared_ptr<SystemInterface> haptic_device_;
 
  private:
-  // ROS2 subscribtions
-  rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuoseStatus>::SharedPtr
-      out_virtuose_status_;
-  rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuosePose>::SharedPtr
-      _out_virtuose_pose_;
   rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr
       ft_subscriber_;
-  // ROS2 publishers
-  rclcpp::Publisher<raptor_api_interfaces::msg::InVirtuoseForce>::SharedPtr
-      _in_virtuose_force;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
       target_frame_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
@@ -83,12 +65,8 @@ class HapticControlBase : public rclcpp::Node {
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
       desired_frame_pub_;
 
-  // ROS2 service client_s
-  rclcpp::Client<raptor_api_interfaces::srv::VirtuoseImpedance>::SharedPtr
-      client_;
   // ROS2 timers
   rclcpp::TimerBase::SharedPtr pose_update_timer_;
-  rclcpp::TimerBase::SharedPtr impedanceThread_;
   // ROS2 tf2 transform listener and buffer
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -108,7 +86,6 @@ class HapticControlBase : public rclcpp::Node {
   geometry_msgs::msg::PoseStamped ee_current_pose_;
   geometry_msgs::msg::PoseStamped haptic_starting_position_;
   Eigen::Quaterniond q_haptic_base_to_robot_base_;
-  raptor_api_interfaces::msg::InVirtuoseForce old_force_;
   double safety_sphere_radius_, safety_box_width_, safety_box_length_,
       safety_box_height_;
   double max_force_;

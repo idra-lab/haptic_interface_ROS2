@@ -67,20 +67,6 @@ HapticControlBase::HapticControlBase(const std::string &name,
   current_wrench_.wrench.torque.y = 0.0;
   current_wrench_.wrench.torque.z = 0.0;
 
-  // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preparing publishers");
-  out_virtuose_status_ =
-      this->create_subscription<raptor_api_interfaces::msg::OutVirtuoseStatus>(
-          "out_virtuose_status", 1,
-          std::bind(&HapticControlBase::out_virtuose_statusCB, this, _1));
-  _out_virtuose_pose_ =
-      this->create_subscription<raptor_api_interfaces::msg::OutVirtuosePose>(
-          "out_virtuose_pose", 1,
-          std::bind(&HapticControlBase::out_virtuose_pose_CB, this, _1));
-
-  _in_virtuose_force =
-      this->create_publisher<raptor_api_interfaces::msg::InVirtuoseForce>(
-          "in_virtuose_force", 1);
-
   target_frame_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
       "target_frame", 1);
   desired_frame_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
@@ -92,9 +78,6 @@ HapticControlBase::HapticControlBase(const std::string &name,
   ft_subscriber_ = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
       "bus0/ft_sensor0/ft_sensor_readings/wrench", 1,
       std::bind(&HapticControlBase::set_wrench, this, _1));
-
-  client_ = this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
-      "virtuose_impedance");
 
   // Set a callback for parameters updates
   // Safety sphere
@@ -130,11 +113,10 @@ HapticControlBase::HapticControlBase(const std::string &name,
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
   // defines the rotation from the robot base frame to the haptic base frame
-  Eigen::Quaterniond tmp(Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
-  q_haptic_base_to_robot_base_.x() = tmp.x();
-  q_haptic_base_to_robot_base_.y() = tmp.y();
-  q_haptic_base_to_robot_base_.z() = tmp.z();
-  q_haptic_base_to_robot_base_.w() = tmp.w();
+  Eigen::Quaterniond q_haptic_base_to_robot_base_(
+      Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
+  haptic_device_ =
+      std::make_shared<SystemInterface>(q_haptic_base_to_robot_base_);
 
   // read new pose
   x_new_ << 0.0, 0.0, 0.0;
@@ -235,12 +217,6 @@ void HapticControlBase::out_virtuose_pose_CB(
   } else {
     x_tilde_new_ = x_new_;
   }
-
-  // if (ctr_ % 1000 == 0)
-  // {
-  // printf("Virtuose pose: %f %f %f %f %f %f %f\n", cur_pose_[0], cur_pose_[1],
-  // cur_pose_[2], cur_pose_[3], cur_pose_[4], cur_pose_[5], cur_pose_[6]);
-  // }
 }
 
 // Callback for topic out_virtuose_status
@@ -299,60 +275,6 @@ void HapticControlBase::call_impedance_service() {
 
   // Request impedance mode
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending impedance request");
-
-  auto imp = std::make_shared<
-      raptor_api_interfaces::srv::VirtuoseImpedance::Request>();
-  this->get_parameter("channel", imp->channel);
-  this->get_parameter("ff_device_ip_address", imp->ff_device_ip_address);
-  this->get_parameter("ff_device_param_file", imp->ff_device_param_file);
-  this->get_parameter("local_ip_address", imp->local_ip_address);
-
-  imp->base_frame.translation.x = 0.0;
-  imp->base_frame.translation.y = 0.0;
-  imp->base_frame.translation.z = 0.0;
-
-  imp->base_frame.rotation.x = q_haptic_base_to_robot_base_.x();
-  imp->base_frame.rotation.y = q_haptic_base_to_robot_base_.y();
-  imp->base_frame.rotation.z = q_haptic_base_to_robot_base_.z();
-  imp->base_frame.rotation.w = q_haptic_base_to_robot_base_.w();
-
-  while (!client_->wait_for_service(1s)) {
-    if (!rclcpp::ok()) {
-      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                   "Interrupted while waiting for the service. Exiting.");
-      return;
-    }
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-                "service not available, waiting again...");
-  }
-
-  auto result = client_->async_send_request(imp);
-  // Wait for the result.
-  if (rclcpp::spin_until_future_complete(this->get_node_base_interface(),
-                                         result) ==
-      rclcpp::FutureReturnCode::SUCCESS) {
-    // Store client_ ID given by virtuose_node
-    client__id_ = result.get()->client_id;
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client_ ID is: %d",
-                client__id_);
-  } else {
-    RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                 "Failed to call service impedance");
-    return;
-  }
-
-  if (client__id_ == 0) {
-    RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                 "Failed to call service impedance, client__id_ is zero!");
-    return;
-  }
-
-  ctr_ = 0;
-
-  // Perform impedance loop at 1000 Hz
-  impedanceThread_ = this->create_wall_timer(
-      1ms, std::bind(&HapticControlBase::impedance_thread, this));
-  RCLCPP_INFO(this->get_logger(), "\033[0;32mImpedance thread started\033[0m");
 }
 
 // This function is called at 1000 Hz
@@ -363,59 +285,62 @@ void HapticControlBase::impedance_thread() {
     return;
   }
   // Apply the force
-  raptor_api_interfaces::msg::InVirtuoseForce force;
-  force.header.stamp.nanosec = get_clock()->now().nanoseconds();
-  force.header.stamp.sec = get_clock()->now().seconds();
-  force.client_id = client__id_;
-  // filter noise
-  float alpha = 0;
-  force.virtuose_force.force.x =
-      0.3 * (alpha * old_force_.virtuose_force.force.x +
-             (1 - alpha) * current_wrench_.wrench.force.x);
-  force.virtuose_force.force.y =
-      0.3 * (alpha * old_force_.virtuose_force.force.y +
-             (1 - alpha) * current_wrench_.wrench.force.y);
-  force.virtuose_force.force.z =
-      0.3 * (alpha * old_force_.virtuose_force.force.z +
-             (1 - alpha) * current_wrench_.wrench.force.z);
-  // torque omitted for control simplicity
-  force.virtuose_force.torque.x =
-      0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.x + (1 - alpha)
-            // * current_wrench_.wrench.torque.x);
-  force.virtuose_force.torque.y =
-      0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.y + (1 - alpha)
-            // * current_wrench_.wrench.torque.y);
-  force.virtuose_force.torque.z =
-      0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.z + (1 - alpha)
-            // * current_wrench_.wrench.torque.z);
-
-  // SAFE ZONE FORCE
-
-  force.virtuose_force.force.x =
-      std::clamp(force.virtuose_force.force.x, -6.0, 6.0);
-  force.virtuose_force.force.y =
-      std::clamp(force.virtuose_force.force.y, -6.0, 6.0);
-  force.virtuose_force.force.z =
-      std::clamp(force.virtuose_force.force.z, -6.0, 6.0);
-
-  // // SAFE ZONE TORQUE
+  // raptor_api_interfaces::msg::InVirtuoseForce force;
+  // force.header.stamp.nanosec = get_clock()->now().nanoseconds();
+  // force.header.stamp.sec = get_clock()->now().seconds();
+  // force.client_id = client__id_;
+  // // filter noise
+  // float alpha = 0;
+  // force.virtuose_force.force.x =
+  //     0.3 * (alpha * old_force_.virtuose_force.force.x +
+  //            (1 - alpha) * current_wrench_.wrench.force.x);
+  // force.virtuose_force.force.y =
+  //     0.3 * (alpha * old_force_.virtuose_force.force.y +
+  //            (1 - alpha) * current_wrench_.wrench.force.y);
+  // force.virtuose_force.force.z =
+  //     0.3 * (alpha * old_force_.virtuose_force.force.z +
+  //            (1 - alpha) * current_wrench_.wrench.force.z);
+  // // torque omitted for control simplicity
   // force.virtuose_force.torque.x =
-  // std::clamp(force.virtuose_force.torque.x,-0.2,0.2);
+  //     0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.x + (1 -
+  //     alpha)
+  //           // * current_wrench_.wrench.torque.x);
   // force.virtuose_force.torque.y =
-  // std::clamp(force.virtuose_force.torque.y,-0.2,0.2);
+  //     0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.y + (1 -
+  //     alpha)
+  //           // * current_wrench_.wrench.torque.y);
   // force.virtuose_force.torque.z =
-  // std::clamp(force.virtuose_force.torque.z,-0.2,0.2);
+  //     0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.z + (1 -
+  //     alpha)
+  //           // * current_wrench_.wrench.torque.z);
 
-  // updating old force
-  old_force_.virtuose_force.force.x = force.virtuose_force.force.x;
-  old_force_.virtuose_force.force.y = force.virtuose_force.force.y;
-  old_force_.virtuose_force.force.z = force.virtuose_force.force.z;
-  old_force_.virtuose_force.torque.x = force.virtuose_force.torque.x;
-  old_force_.virtuose_force.torque.y = force.virtuose_force.torque.y;
-  old_force_.virtuose_force.torque.z = force.virtuose_force.torque.z;
+  // // SAFE ZONE FORCE
 
-  _in_virtuose_force->publish(force);
-  ctr_++;
+  // force.virtuose_force.force.x =
+  //     std::clamp(force.virtuose_force.force.x, -6.0, 6.0);
+  // force.virtuose_force.force.y =
+  //     std::clamp(force.virtuose_force.force.y, -6.0, 6.0);
+  // force.virtuose_force.force.z =
+  //     std::clamp(force.virtuose_force.force.z, -6.0, 6.0);
+
+  // // // SAFE ZONE TORQUE
+  // // force.virtuose_force.torque.x =
+  // // std::clamp(force.virtuose_force.torque.x,-0.2,0.2);
+  // // force.virtuose_force.torque.y =
+  // // std::clamp(force.virtuose_force.torque.y,-0.2,0.2);
+  // // force.virtuose_force.torque.z =
+  // // std::clamp(force.virtuose_force.torque.z,-0.2,0.2);
+
+  // // updating old force
+  // old_force_.virtuose_force.force.x = force.virtuose_force.force.x;
+  // old_force_.virtuose_force.force.y = force.virtuose_force.force.y;
+  // old_force_.virtuose_force.force.z = force.virtuose_force.force.z;
+  // old_force_.virtuose_force.torque.x = force.virtuose_force.torque.x;
+  // old_force_.virtuose_force.torque.y = force.virtuose_force.torque.y;
+  // old_force_.virtuose_force.torque.z = force.virtuose_force.torque.z;
+
+  // _in_virtuose_force->publish(force);
+  // ctr_++;
 
   // Publish target position
   target_pose_.header.stamp = target_pose_tf_.header.stamp = get_clock()->now();
@@ -545,6 +470,7 @@ int main(int argc, char **argv) {
   if (node->use_fixtures_) {
     node->init_vf_enforcer();
   }
+  node->haptic_device_->create_connection();
   node->call_impedance_service();
   rclcpp::spin(node);
   rclcpp::shutdown();
