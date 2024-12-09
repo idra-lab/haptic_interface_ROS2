@@ -40,10 +40,11 @@ class HapticControlBase : public rclcpp::Node {
   void set_safety_box_length_CB(const rclcpp::Parameter &p);
   void set_safety_box_height_CB(const rclcpp::Parameter &p);
   void update_current_ee_pos();
-  void set_wrench(const geometry_msgs::msg::WrenchStamped target_wrench);
-
-  void call_impedance_service();
-  void impedance_thread();
+  void store_wrench(const geometry_msgs::msg::WrenchStamped target_wrench);
+  Eigen::Vector3d compute_position_error();
+  Eigen::Quaterniond compute_orientation_error();
+  void initialize();
+  void control_thread();
   void get_ee_trans(geometry_msgs::msg::TransformStamped &trans);
   void init_vf_enforcer();
   void project_target_on_sphere(Eigen::Vector3d &target_position_vec,
@@ -84,8 +85,8 @@ class HapticControlBase : public rclcpp::Node {
   geometry_msgs::msg::PoseStamped old_pose_;
   geometry_msgs::msg::PoseStamped ee_starting_position;
   geometry_msgs::msg::PoseStamped ee_current_pose_;
-  geometry_msgs::msg::PoseStamped haptic_starting_position_;
-  Eigen::Quaterniond q_haptic_base_to_robot_base_;
+  geometry_msgs::msg::PoseStamped haptic_starting_pose_;
+  Eigen::Quaterniond q_haptic_base_to_robot_base_, qEEStart;
   double safety_sphere_radius_, safety_box_width_, safety_box_length_,
       safety_box_height_;
   double max_force_;
@@ -104,8 +105,8 @@ class HapticControlBase : public rclcpp::Node {
   int client__id_;
   int ctr_;
   // Storage for virtuose pose
-  int64_t pose_date_sec_;
-  uint32_t pose_date_nanosec_;
+  //   int64_t pose_date_sec_;
+  //   uint32_t pose_date_nanosec_;
   std::array<double, 7> cur_pose_;
   std::array<double, 3> bounding_box_center_;
   uint32_t status_state_;
@@ -116,6 +117,8 @@ class HapticControlBase : public rclcpp::Node {
   Eigen::Vector3d x_tilde_old_, x_tilde_new_;
 
   std::shared_ptr<VFEnforcer> vf_enforcer_;
+  // ros control_thread_
+    rclcpp::TimerBase::SharedPtr control_thread_;
 };
 
 #endif  // __HAPTIC_CONTROL_BASE__

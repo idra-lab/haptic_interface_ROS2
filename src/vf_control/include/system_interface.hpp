@@ -102,13 +102,6 @@ class SystemInterface : public rclcpp::Node {
     }
 
     ctr_ = 0;
-
-    // Perform impedance loop at 1000 Hz
-    impedanceThread_ = this->create_wall_timer(
-        std::literals::chrono_literals::operator""s(1),
-        std::bind(&SystemInterface::impedance_thread, this));
-    RCLCPP_INFO(this->get_logger(),
-                "\033[0;32mImpedance thread started\033[0m");
   }
 
   void apply_target_wrench(geometry_msgs::msg::WrenchStamped target_wrench) {
@@ -133,24 +126,27 @@ class SystemInterface : public rclcpp::Node {
 
     // SAFE ZONE FORCE
 
-    force.virtuose_force.force.x =
-        std::clamp(force.virtuose_force.force.x, -max_force_, max_force_);
-    force.virtuose_force.force.y =
-        std::clamp(force.virtuose_force.force.y, -max_force_, max_force_);
-    force.virtuose_force.force.z =
-        std::clamp(force.virtuose_force.force.z, -max_force_, max_force_);
+    force_.virtuose_force.force.x =
+        std::clamp(force_.virtuose_force.force.x, -max_force_, max_force_);
+    force_.virtuose_force.force.y =
+        std::clamp(force_.virtuose_force.force.y, -max_force_, max_force_);
+    force_.virtuose_force.force.z =
+        std::clamp(force_.virtuose_force.force.z, -max_force_, max_force_);
 
     // updating old force
-    old_force_.virtuose_force.force.x = force.virtuose_force.force.x;
-    old_force_.virtuose_force.force.y = force.virtuose_force.force.y;
-    old_force_.virtuose_force.force.z = force.virtuose_force.force.z;
-    old_force_.virtuose_force.torque.x = force.virtuose_force.torque.x;
-    old_force_.virtuose_force.torque.y = force.virtuose_force.torque.y;
-    old_force_.virtuose_force.torque.z = force.virtuose_force.torque.z;
+    old_force_.virtuose_force.force.x = force_.virtuose_force.force.x;
+    old_force_.virtuose_force.force.y = force_.virtuose_force.force.y;
+    old_force_.virtuose_force.force.z = force_.virtuose_force.force.z;
+    old_force_.virtuose_force.torque.x = force_.virtuose_force.torque.x;
+    old_force_.virtuose_force.torque.y = force_.virtuose_force.torque.y;
+    old_force_.virtuose_force.torque.z = force_.virtuose_force.torque.z;
 
-    _in_virtuose_force->publish(force);
+    _in_virtuose_force->publish(force_);
     ctr_++;
   }
+
+  geometry_msgs::msg::PoseStamped haptic_starting_pose_, haptic_current_pose_;
+  bool received_haptic_pose_ = false;
 
  private:
   raptor_api_interfaces::msg::InVirtuoseForce force_;
@@ -169,13 +165,42 @@ class SystemInterface : public rclcpp::Node {
       _out_virtuose_pose_;
   rclcpp::Client<raptor_api_interfaces::srv::VirtuoseImpedance>::SharedPtr
       impedance_client_;
+
   void out_virtuose_pose_CB(
-      const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg) {}
+      const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg) {
+    if (!received_haptic_pose_) {
+      // Store last pose date
+      received_haptic_pose_ = true;
+      haptic_starting_pose_.pose.position.x = msg->virtuose_pose.translation.x;
+      haptic_starting_pose_.pose.position.y = msg->virtuose_pose.translation.y;
+      haptic_starting_pose_.pose.position.z = msg->virtuose_pose.translation.z;
+      haptic_starting_pose_.pose.orientation.x = msg->virtuose_pose.rotation.x;
+      haptic_starting_pose_.pose.orientation.y = msg->virtuose_pose.rotation.y;
+      haptic_starting_pose_.pose.orientation.z = msg->virtuose_pose.rotation.z;
+      haptic_starting_pose_.pose.orientation.w = msg->virtuose_pose.rotation.w;
+    }
+    // pose_date_nanosec_ = msg->header.stamp.nanosec;
+    // pose_date_sec_ = msg->header.stamp.sec;
+    haptic_current_pose_.pose.position.x = msg->virtuose_pose.translation.x;
+    haptic_current_pose_.pose.position.y = msg->virtuose_pose.translation.y;
+    haptic_current_pose_.pose.position.z = msg->virtuose_pose.translation.z;
+    haptic_current_pose_.pose.orientation.x = msg->virtuose_pose.rotation.x;
+    haptic_current_pose_.pose.orientation.y = msg->virtuose_pose.rotation.y;
+    haptic_current_pose_.pose.orientation.z = msg->virtuose_pose.rotation.z;
+    haptic_current_pose_.pose.orientation.w = msg->virtuose_pose.rotation.w;
+
+    // ENFORCE SPHERE SAFETY
+    // TODO: implement safety sphere
+    // if (enable_safety_sphere_) {
+    //   x_tilde_new_ = x_tilde_old_ + (x_new_ - x_old_);
+    // } else {
+    //   x_tilde_new_ = x_new_;
+    // }
+  }
   void out_virtuose_statusCB(
       const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg) {}
   // thread
   rclcpp::TimerBase::SharedPtr impedanceThread_;
-  void impedance_thread(){};
-}
+};
 
 #endif  // __SYSTEM_INTERFACE_HPP__
