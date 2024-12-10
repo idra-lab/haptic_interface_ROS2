@@ -94,7 +94,6 @@ class SystemInterface : public rclcpp::Node {
     }
     set_target_wrench_timer_ = this->create_wall_timer(
         1ms, std::bind(&SystemInterface::apply_target_wrench, this));
-    // Constructor body if needed
   }
 
   void update_target_wrench(
@@ -103,7 +102,10 @@ class SystemInterface : public rclcpp::Node {
   }
 
   void apply_target_wrench() {
-    force_.header.stamp = get_clock()->now(); 
+    if (!received_haptic_pose_) {
+      return;
+    }
+    raptor_api_interfaces::msg::InVirtuoseForce force_;
     force_.client_id = client__id_;
     // filter noise
     force_.virtuose_force.force.x =
@@ -130,13 +132,9 @@ class SystemInterface : public rclcpp::Node {
         std::clamp(force_.virtuose_force.force.z, -max_force_, max_force_);
 
     // updating old force
-    old_force_.virtuose_force.force.x = force_.virtuose_force.force.x;
-    old_force_.virtuose_force.force.y = force_.virtuose_force.force.y;
-    old_force_.virtuose_force.force.z = force_.virtuose_force.force.z;
-    old_force_.virtuose_force.torque.x = force_.virtuose_force.torque.x;
-    old_force_.virtuose_force.torque.y = force_.virtuose_force.torque.y;
-    old_force_.virtuose_force.torque.z = force_.virtuose_force.torque.z;
+    old_force_ = force_;
 
+    force_.header.stamp = get_clock()->now();
     wrench_publisher_->publish(force_);
   }
 
@@ -167,7 +165,6 @@ class SystemInterface : public rclcpp::Node {
   geometry_msgs::msg::WrenchStamped target_wrench_;
 
  private:
-  raptor_api_interfaces::msg::InVirtuoseForce force_;
   raptor_api_interfaces::msg::InVirtuoseForce old_force_;
   int client__id_ = 0;
   const double alpha_ = 0.0;

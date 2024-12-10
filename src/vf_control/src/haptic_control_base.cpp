@@ -48,7 +48,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
     this->safety_box_height_ = std::numeric_limits<double>::infinity();
   }
 
-  this->get_parameter("max_force_", max_force_);
+  this->get_parameter("max_force", max_force_);
   // safety XYZ position zone -> read from config file
   this->force_scale_ = this->get_parameter("force_scale").as_double();
   this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
@@ -65,7 +65,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
 
   // Create a parameter subscriber that can be used to monitor parameter changes
   param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
-  this->get_parameter("max_force_", max_force_);
+  this->get_parameter("max_force", max_force_);
 
   // init wrench msg
   current_wrench_.header.frame_id = base_link_name_;
@@ -176,17 +176,18 @@ void HapticControlBase::set_safety_box_height_CB(const rclcpp::Parameter &p) {
 void HapticControlBase::store_wrench(
     const geometry_msgs::msg::WrenchStamped target_wrench) {
   current_wrench_.header.stamp = target_wrench.header.stamp;
-  geometry_msgs::msg::WrenchStamped force;
-  force.header.stamp = target_wrench.header.stamp;
-  force.wrench = target_wrench.wrench;
+  
+  geometry_msgs::msg::WrenchStamped wrench_stamped;
+  wrench_stamped.header.stamp = target_wrench.header.stamp;
+  wrench_stamped.wrench = target_wrench.wrench;
   // Map forces from probe frame to haptic base frame (since haptic base frame
   // coincides with robot base frame)
   try {
     auto trans = tf_buffer_->lookupTransform(base_link_name_, ft_link_name_,
                                              tf2::TimePointZero);
     // apply rotation to the force
-    tf2::doTransform(force, force, trans);
-    current_wrench_.wrench = force.wrench;
+    tf2::doTransform(wrench_stamped, wrench_stamped, trans);
+    current_wrench_.wrench = wrench_stamped.wrench;
   } catch (tf2::TransformException &ex) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                           "F/T sensor pose transform not available: %s",
@@ -371,10 +372,10 @@ void HapticControlBase::control_thread() {
     old_target_pose_vf_ = target_pose_vf_;
   }
 
-  RCLCPP_INFO_THROTTLE(
-      this->get_logger(), *this->get_clock(), 100,
-      "Target position: x: %f | y: %f | z: %f", target_pose_.pose.position.x,
-      target_pose_.pose.position.y, target_pose_.pose.position.z);
+  // RCLCPP_INFO_THROTTLE(
+  //     this->get_logger(), *this->get_clock(), 100,
+  //     "Target position: x: %f | y: %f | z: %f", target_pose_.pose.position.x,
+  //     target_pose_.pose.position.y, target_pose_.pose.position.z);
 
   // Publish the current ee pose
   geometry_msgs::msg::TransformStamped ee_pose;

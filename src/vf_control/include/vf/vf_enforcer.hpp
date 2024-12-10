@@ -90,6 +90,9 @@ class VFEnforcer {
       // return last delta_x_
       return Eigen::Vector3d(0.0, 0.0, 0.0);
     }
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Enforcing VF since x_des: "
+                                               << x_des.transpose()
+                                               << " x_old: " << x_old_.transpose());
     delta_x_ = compute_vf::enforce_virtual_fixture(*mesh_, x_des, x_old_,
                                                    radius_, constraint_planes_,
                                                    lookup_area_, *visualizer_);

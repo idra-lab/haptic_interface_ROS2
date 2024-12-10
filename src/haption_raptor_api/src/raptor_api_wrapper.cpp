@@ -120,7 +120,7 @@ class RaptorAPIWrapper : public rclcpp::Node {
     }
     // Watchdog on receiving pose setpoint
     if ((_now - last_loop_date) > 30000000) {
-      RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                   "Timeout on set pose: %ld, going to state READY",
                   _now - last_loop_date);
       Reset();
@@ -153,7 +153,7 @@ class RaptorAPIWrapper : public rclcpp::Node {
     }
     // Watchdog on receiving speed setpoint
     if ((_now - last_loop_date) > 30000000) {
-      RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                   "Timeout on set speed: %ld, going to state READY",
                   _now - last_loop_date);
       Reset();
@@ -179,14 +179,14 @@ class RaptorAPIWrapper : public rclcpp::Node {
     last_in_date = _now;
 
     if (ctr % 1000 == 0) {
-      RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-                  "Force set point: %f %f %f %f %f %f", set_force[0],
-                  set_force[1], set_force[2], set_force[3], set_force[4],
-                  set_force[5]);
+      // RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+      //             "Force set point: %f %f %f %f %f %f", set_force[0],
+      //             set_force[1], set_force[2], set_force[3], set_force[4],
+      //             set_force[5]);
     }
     // Watchdog on receiving force setpoint
     if ((_now - last_loop_date) > 30000000) {
-      RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                   "Timeout on set force: %ld, going to state READY",
                   _now - last_loop_date);
       Reset();
@@ -910,8 +910,8 @@ class RaptorAPIWrapper : public rclcpp::Node {
     // Watchdog on receiving force setpoint
     if (isFirstSetpointReceived &&
         abs((int64_t)last_in_date - (int64_t)last_loop_date) > 30000000) {
-      RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-                  "Timeout on set force: %ld, going to state READY",
+      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
+                  "Impedance thread: Timeout on set force: %ld, going to state READY",
                   last_in_date - last_loop_date);
       Reset();
       return;
