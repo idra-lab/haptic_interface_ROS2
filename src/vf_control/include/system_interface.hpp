@@ -19,6 +19,7 @@
 inline double filter_force(double alpha, double v, double v_old) {
   return alpha * v_old + (1 - alpha) * v;
 }
+using namespace std::chrono_literals;
 class SystemInterface : public rclcpp::Node {
  public:
   explicit SystemInterface(
@@ -42,8 +43,6 @@ class SystemInterface : public rclcpp::Node {
     impedance_client_ =
         this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
             "virtuose_impedance");
-
-    // Constructor body if needed
   }
   void create_connection() {
     auto imp = std::make_shared<
@@ -93,21 +92,28 @@ class SystemInterface : public rclcpp::Node {
                    "Failed to call service impedance, client__id_ is zero!");
       return;
     }
+    set_target_wrench_timer_ = this->create_wall_timer(
+        1ms, std::bind(&SystemInterface::apply_target_wrench, this));
+    // Constructor body if needed
   }
 
-  void apply_target_wrench(geometry_msgs::msg::WrenchStamped target_wrench) {
-    force_.header.stamp.nanosec = target_wrench.header.stamp.nanosec;
-    force_.header.stamp.sec = target_wrench.header.stamp.sec;
+  void update_target_wrench(
+      const geometry_msgs::msg::WrenchStamped target_wrench) {
+    target_wrench_ = target_wrench;
+  }
+
+  void apply_target_wrench() {
+    force_.header.stamp = get_clock()->now(); 
     force_.client_id = client__id_;
     // filter noise
     force_.virtuose_force.force.x =
-        scale_ * filter_force(alpha_, target_wrench.wrench.force.x,
+        scale_ * filter_force(alpha_, target_wrench_.wrench.force.x,
                               old_force_.virtuose_force.force.x);
     force_.virtuose_force.force.y =
-        scale_ * filter_force(alpha_, target_wrench.wrench.force.y,
+        scale_ * filter_force(alpha_, target_wrench_.wrench.force.y,
                               old_force_.virtuose_force.force.y);
     force_.virtuose_force.force.z =
-        scale_ * filter_force(alpha_, target_wrench.wrench.force.z,
+        scale_ * filter_force(alpha_, target_wrench_.wrench.force.z,
                               old_force_.virtuose_force.force.z);
 
     // torque omitted for control simplicity
@@ -158,6 +164,7 @@ class SystemInterface : public rclcpp::Node {
 
   geometry_msgs::msg::PoseStamped haptic_starting_pose_, haptic_current_pose_;
   bool received_haptic_pose_ = false;
+  geometry_msgs::msg::WrenchStamped target_wrench_;
 
  private:
   raptor_api_interfaces::msg::InVirtuoseForce force_;
@@ -175,7 +182,7 @@ class SystemInterface : public rclcpp::Node {
       pose_subscriber_;
   rclcpp::Client<raptor_api_interfaces::srv::VirtuoseImpedance>::SharedPtr
       impedance_client_;
-  rclcpp::TimerBase::SharedPtr impedanceThread_;
+  rclcpp::TimerBase::SharedPtr set_target_wrench_timer_;
 };
 
 #endif  // __SYSTEM_INTERFACE_HPP__

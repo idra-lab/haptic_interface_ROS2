@@ -114,8 +114,6 @@ HapticControlBase::HapticControlBase(const std::string &name,
       std::bind(&HapticControlBase::set_safety_box_height_CB, this,
                 std::placeholders::_1));
 
-  received_haptic_pose_ = false;
-
   // Initializes the TF2 transform listener and buffer
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -245,7 +243,8 @@ void HapticControlBase::initialize_haptic_control() {
 
   while (!haptic_device_->received_haptic_pose_) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                          "Wait for the haptic device to start publishing");
+                          "Waiting for the haptic device to start publishing");
+    rclcpp::spin_some(haptic_device_);
   }
   x_new_ << haptic_device_->haptic_starting_pose_.pose.position.x,
       haptic_device_->haptic_starting_pose_.pose.position.y,
@@ -257,8 +256,7 @@ void HapticControlBase::initialize_haptic_control() {
   }
   // Perform impedance loop at 1000 Hz
   control_thread_ = this->create_wall_timer(
-      std::literals::chrono_literals::operator""s(1),
-      std::bind(&HapticControlBase::control_thread, this));
+      1ms, std::bind(&HapticControlBase::control_thread, this));
   RCLCPP_INFO(this->get_logger(), "\033[0;32mControl thread started\033[0m");
 }
 
@@ -294,7 +292,7 @@ Eigen::Quaterniond HapticControlBase::compute_orientation_error() {
 
 // This function is called at 1000 Hz
 void HapticControlBase::control_thread() {
-  if (!received_haptic_pose_) {
+  if (!haptic_device_->received_haptic_pose_) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                           "Haptic pose not available");
     return;
@@ -306,7 +304,7 @@ void HapticControlBase::control_thread() {
     x_tilde_new_ = x_new_;
   }
   // Applies the feedback force
-  haptic_device_->apply_target_wrench(current_wrench_);
+  haptic_device_->update_target_wrench(current_wrench_);
 
   // Computes errors
   Eigen::Vector3d position_error = compute_position_error();
@@ -421,7 +419,9 @@ int main(int argc, char **argv) {
 
   node->initialize_haptic_control();
 
-  rclcpp::spin(node);
-  rclcpp::shutdown();
+  rclcpp::executors::MultiThreadedExecutor executor;
+  executor.add_node(node);
+  executor.add_node(node->haptic_device_);
+  executor.spin();
   return 0;
 }

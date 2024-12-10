@@ -96,8 +96,8 @@ def generate_launch_description():
         arguments=["-d", get_package_share_directory("vf_control") + "/rviz/vf.rviz"],
         # condition=LaunchConfigurationEquals("use_fixtures", "true"),
     )
-    # ld.add_action(haptic_wrapper)
-    # ld.add_action(haptic_calibration_node)
+    ld.add_action(haptic_wrapper)
+    ld.add_action(haptic_calibration_node)
     ld.add_action(vf_node)
     # ld.add_action(rviz)
     return ld
