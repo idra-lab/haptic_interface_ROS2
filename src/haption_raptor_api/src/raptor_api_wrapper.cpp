@@ -288,6 +288,8 @@ class RaptorAPIWrapper : public rclcpp::Node {
               break;
             case HAPTION::CalibrationStatus::C_IDLE:
               break;
+            default:
+              break;
           }
         }
         // Update status

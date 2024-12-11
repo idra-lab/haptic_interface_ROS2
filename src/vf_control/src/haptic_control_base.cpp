@@ -1,5 +1,4 @@
 #include "haptic_control_base.hpp"
-
 using namespace Eigen;
 
 using std::placeholders::_1;
@@ -36,6 +35,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
   // safety box dimension
   this->enable_safety_box_ = this->get_parameter("enable_safety_box").as_bool();
   if (this->enable_safety_box_) {
+    // not implemented yet
     this->safety_box_width_ =
         this->get_parameter("safety_box_width").as_double();  // x
     this->safety_box_length_ =
@@ -49,19 +49,31 @@ HapticControlBase::HapticControlBase(const std::string &name,
   }
 
   this->get_parameter("max_force", max_force_);
-  // safety XYZ position zone -> read from config file
   this->force_scale_ = this->get_parameter("force_scale").as_double();
   this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
   this->base_link_name_ = this->get_parameter("base_link_name").as_string();
   this->ft_link_name_ = this->get_parameter("ft_link_name").as_string();
+  this->haptic_control_rate_ =
+      this->get_parameter("haptic_control_rate").as_double();
+  this->ft_sensor_rate_ = this->get_parameter("ft_sensor_rate").as_double();
 
   // delay simulation
+  delay_loop_haptic_ = delay_loop_ft_ = 1;
   this->delay_ = this->get_parameter("delay").as_double();
   this->delay_ = std::clamp(this->delay_, 0.0, 10.0);
   if (std::abs(this->delay_) > 1e-6) {
-    RCLCPP_WARN(this->get_logger(), "A Delay of %f seconds is set",
-                this->delay_);
+    // compute the number of control loop of delay (haptic run at 1kHz)
+    this->delay_loop_haptic_ =
+        (int)std::ceil((this->delay_) * haptic_control_rate_);
+    this->delay_loop_ft_ = (int)std::ceil((this->delay_) * ft_sensor_rate_);
+    RCLCPP_WARN(this->get_logger(),
+                "A Delay of %f seconds is set, which cooresponds to a %d "
+                "control loop delay",
+                this->delay_, this->delay_loop_haptic_);
   }
+  wrench_buffer_.initialize(delay_loop_ft_);
+  target_pose_buffer_.initialize(delay_loop_haptic_);
+  target_pose_vf_buffer_.initialize(delay_loop_haptic_);
 
   // Create a parameter subscriber that can be used to monitor parameter changes
   param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
@@ -125,9 +137,9 @@ HapticControlBase::HapticControlBase(const std::string &name,
   haptic_device_ =
       std::make_shared<SystemInterface>(q_haptic_base_to_robot_base_);
 
-  // read new pose
+  // new pose
   x_new_ << 0.0, 0.0, 0.0;
-  // read old pose
+  // old pose
   x_old_ << 0.0, 0.0, 0.0;
   // safe new pose
   x_tilde_new_ << 0.0, 0.0, 0.0;
@@ -176,7 +188,7 @@ void HapticControlBase::set_safety_box_height_CB(const rclcpp::Parameter &p) {
 void HapticControlBase::store_wrench(
     const geometry_msgs::msg::WrenchStamped target_wrench) {
   current_wrench_.header.stamp = target_wrench.header.stamp;
-  
+
   geometry_msgs::msg::WrenchStamped wrench_stamped;
   wrench_stamped.header.stamp = target_wrench.header.stamp;
   wrench_stamped.wrench = target_wrench.wrench;
@@ -193,8 +205,8 @@ void HapticControlBase::store_wrench(
                           "F/T sensor pose transform not available: %s",
                           ex.what());
     current_wrench_.wrench = geometry_msgs::msg::Wrench();
-    return;
   }
+  wrench_buffer_.push(current_wrench_);
 }
 
 void HapticControlBase::get_ee_trans(
@@ -247,17 +259,28 @@ void HapticControlBase::initialize_haptic_control() {
                           "Waiting for the haptic device to start publishing");
     rclcpp::spin_some(haptic_device_);
   }
+  haptic_device_->start_force_feedback();
   x_new_ << haptic_device_->haptic_starting_pose_.pose.position.x,
       haptic_device_->haptic_starting_pose_.pose.position.y,
       haptic_device_->haptic_starting_pose_.pose.position.z;
   x_old_ = x_tilde_old_ = x_new_;
 
+  // in the case of no delay, the buffer will contain only the last element
+  for (int i = 0; i < delay_loop_haptic_; i++) {
+    target_pose_buffer_.push(ee_starting_position);
+    target_pose_vf_buffer_.push(ee_starting_position);
+  }
+  for (int i = 0; i < delay_loop_ft_; i++) {
+    wrench_buffer_.push(current_wrench_);
+  }
+
   if (use_fixtures_) {
     init_vf_enforcer();
   }
-  // Perform impedance loop at 1000 Hz
+  // Perform impedance loop at haptic_control_rate Hz
   control_thread_ = this->create_wall_timer(
-      1ms, std::bind(&HapticControlBase::control_thread, this));
+      std::chrono::duration<double>(1.0 / haptic_control_rate_),
+      std::bind(&HapticControlBase::control_thread, this));
   RCLCPP_INFO(this->get_logger(), "\033[0;32mControl thread started\033[0m");
 }
 
@@ -305,8 +328,8 @@ void HapticControlBase::control_thread() {
     x_tilde_new_ = x_new_;
   }
   // Applies the feedback force
-  haptic_device_->update_target_wrench(current_wrench_);
-
+  // retrieve the oldest wrench in the buffer
+  haptic_device_->update_target_wrench(wrench_buffer_.peek());
   // Computes errors
   Eigen::Vector3d position_error = compute_position_error();
   Eigen::Quaterniond orientation_error = compute_orientation_error();
@@ -353,6 +376,8 @@ void HapticControlBase::control_thread() {
       x_tilde_old_ = x_tilde_new_;
     }
   }
+  target_pose_buffer_.push(target_pose_);
+
   if (use_fixtures_) {
     Eigen::Vector3d x_desired(target_pose_.pose.position.x,
                               target_pose_.pose.position.y,
@@ -370,12 +395,9 @@ void HapticControlBase::control_thread() {
     target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
 
     old_target_pose_vf_ = target_pose_vf_;
-  }
 
-  // RCLCPP_INFO_THROTTLE(
-  //     this->get_logger(), *this->get_clock(), 100,
-  //     "Target position: x: %f | y: %f | z: %f", target_pose_.pose.position.x,
-  //     target_pose_.pose.position.y, target_pose_.pose.position.z);
+    target_pose_vf_buffer_.push(target_pose_vf_);
+  }
 
   // Publish the current ee pose
   geometry_msgs::msg::TransformStamped ee_pose;
@@ -386,16 +408,13 @@ void HapticControlBase::control_thread() {
   ee_pose_msg.pose.position = vector3_to_point(ee_pose.transform.translation);
   ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
   current_frame_pub_->publish(ee_pose_msg);
-
   if (this->use_fixtures_) {
     // Publish the target pose
-    target_frame_pub_->publish(target_pose_vf_);
+    target_frame_pub_->publish(target_pose_vf_buffer_.peek());
   } else {
-    // Publish the target pose
-    target_frame_pub_->publish(target_pose_);
+    target_frame_pub_->publish(target_pose_buffer_.peek());
   }
   tf_broadcaster_->sendTransform(target_pose_tf_);
-
   // Publish the desired pose
   desired_frame_pub_->publish(target_pose_);
 

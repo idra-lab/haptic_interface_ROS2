@@ -20,6 +20,7 @@
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 
+#include "circular_buffer.hpp"
 #include "system_interface.hpp"
 #include "utils.hpp"
 #include "vf/vf_enforcer.hpp"
@@ -41,7 +42,6 @@ class HapticControlBase : public rclcpp::Node {
   void set_safety_box_width_CB(const rclcpp::Parameter &p);
   void set_safety_box_length_CB(const rclcpp::Parameter &p);
   void set_safety_box_height_CB(const rclcpp::Parameter &p);
-
   void update_current_ee_pos();
   void store_wrench(const geometry_msgs::msg::WrenchStamped target_wrench);
   Eigen::Vector3d compute_position_error();
@@ -100,7 +100,16 @@ class HapticControlBase : public rclcpp::Node {
   bool received_ee_pose_;
   bool use_limits_;
   bool enable_safety_sphere_, enable_safety_box_;
+  // delay simulation
   double delay_;
+  int delay_loop_haptic_, delay_loop_ft_;
+  double haptic_control_rate_,ft_sensor_rate_;
+//   std::vector<geometry_msgs::msg::WrenchStamped> wrench_history_buffer_;
+    // std::vector<geometry_msgs::msg::PoseStamped> target_pose_history_buffer_,
+    // target_pose_vf_history_buffer_;
+  CircularBuffer<geometry_msgs::msg::WrenchStamped> wrench_buffer_;
+  CircularBuffer<geometry_msgs::msg::PoseStamped> target_pose_buffer_,
+      target_pose_vf_buffer_;
 
   // Storage for virtuose_node status
   std::array<double, 7> cur_pose_;

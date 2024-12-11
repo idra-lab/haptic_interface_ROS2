@@ -92,6 +92,8 @@ class SystemInterface : public rclcpp::Node {
                    "Failed to call service impedance, client__id_ is zero!");
       return;
     }
+  }
+  void start_force_feedback() {
     set_target_wrench_timer_ = this->create_wall_timer(
         1ms, std::bind(&SystemInterface::apply_target_wrench, this));
   }

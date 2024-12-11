@@ -41,8 +41,11 @@ def generate_launch_description():
     # haptic_wrapper
     haptic_wrapper = TimerAction(
         period=0.0,
-        actions=[Node(package="haption_raptor_api", executable="raptor_api_wrapper",prefix=['xterm  -fa "Monospace" -fs 14 -e gdb -ex run --args'])
-],
+        actions=[Node(package="haption_raptor_api", 
+                      executable="raptor_api_wrapper",
+                      # prefix=['xterm  -fa "Monospace" -fs 14 -e gdb -ex run --args']
+                      )
+        ],
     )
 
     haptic_parameters_calibration = (
@@ -77,6 +80,8 @@ def generate_launch_description():
                 ],
                 remappings=[
                     (
+
+                        # remember to change ft_sensor_rate in the yaml file
                         "bus0/ft_sensor0/ft_sensor_readings/wrench",
                         "/force_torque_sensor_broadcaster/wrench",
                     )
