@@ -11,6 +11,8 @@ jobs:
     strategy:
       matrix:
         package-name: 
+          - raptor_api_interfaces
+          - haption_raptor_api
           - test_calibration
           - test_admittance
           - test_impedance
@@ -24,24 +26,7 @@ jobs:
 
       # Step 2: Install additional dependencies
       - name: Install Dependencies
-        run: sudo apt-get update && sudo apt-get install -y libpciaccess-dev libomp-dev
-
-      # Step 3: Clone and build Open3D with caching
-      - name: Cache Open3D Build
-        uses: actions/cache@v3
-        with:
-          path: Open3D/build
-          key: ${{ runner.os }}-open3d-${{ hashFiles('Open3D/**') }}
-
-      - name: Clone and Build Open3D
-        run: |
-          git clone https://github.com/isl-org/Open3D || true
-          cd Open3D
-          source util/install_deps_ubuntu.sh || exit 1
-          mkdir -p build && cd build
-          cmake .. || exit 1
-          make -j$(nproc) || exit 1
-          sudo make install || exit 1
+        run: sudo apt-get update && sudo apt-get install -y libpciaccess-dev libomp-dev libgomp1-dev
 
       # Step 4: Build and process each ROS package
       - name: Build and Process ROS Package
