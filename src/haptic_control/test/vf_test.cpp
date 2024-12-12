@@ -5,8 +5,8 @@
 #include <unistd.h>
 
 #include "open3d/Open3D.h"
-#include "vf/location.hpp"
-#include "vf/mesh.hpp"
+#include "mesh_virtual_fixtures/location.hpp"
+#include "mesh_virtual_fixtures/mesh.hpp"
 
 TEST(vf_control, testFindNearest) {
   auto o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 40);

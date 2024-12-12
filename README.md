@@ -1,7 +1,7 @@
 [![Humble CI](https://github.com/idra-lab/haptic_interface_ROS2/actions/workflows/main.yml/badge.svg)](https://github.com/idra-lab/haptic_interface_ROS2/actions/workflows/main.yml)  
 
 
-*The following instructions are the one that were distribuited with the vendor's code with some clarifications. You must follow the instruction in the haptic documentation first (having the right files under /etc/Haption/). Documentation and libraries are [here](https://drive.google.com/drive/folders/1g4NHb75PtUcHunHAImuzkCfoDhdFXWoR?usp=drive_link). The binaries and the headers are already in the correct folder so ***you do not need to follow point #2***. Also you can avoid points #0 and #4 by running the 'entrypoint.sh'*
+*The following instructions are the one that were distribuited with the vendor's code with some clarifications. You must follow the instruction in the haptic documentation first (having the right files under /etc/Haption/). Documentation and libraries are [here](https://drive.google.com/drive/folders/1g4NHb75PtUcHunHAImuzkCfoDhdFXWoR?usp=drive_link). You can avoid points #0 and #4 by running the 'entrypoint.sh'*
 
 This project includes a basic implementation of the test programs (TestCalibration, TestImpedance and TestAdmittance) distribuited with the haptic interface and the IDRA team's implementation for the teleoperation (under `haptic_control`) using ROS2 and RaptorAPI.
 This guide is written for Linux, Windows users need to adapt it in the appropriate way.
@@ -13,7 +13,7 @@ This guide is written for Linux, Windows users need to adapt it in the appropria
    ```bash
    sudo apt-get install libpciaccess-dev
    ``` 
-The next requirements are needed only if the virtual fixtures are used, otherwise you can delete the `vf_control` package
+The next requirements is needed only if the virtual fixtures are used.
 - OpenMP
   ```
   sudo apt install libomp-dev
@@ -25,71 +25,75 @@ The next requirements are needed only if the virtual fixtures are used, otherwis
     ```bash
     git clone https://github.com/idra-lab/haptic_interface_ROS2 haption_ws
     ```
-1. Source ROS environment and copy shell scripts to the workspace root:
+1. Source ROS environment:
     ```bash
     source /opt/ros/$ROS-DISTRO/local_setup.bash
     ```
-    ```bash
-    cp  <path_to_ws>/src/haptic_interface_ROS2/*.sh  <path_to_ws>
-    ```
-2. Copy the RaptorAPI shared libraries to `src/haption_raptor_api/Dependencies/RaptorAPI/bin/Linux/glibc-<version>`
-3. Copy the `desktop_6D_n65.param` in `/etc/Haption/Connector`. Create the missing folders if needed. The parameters file is stored in the IDRA drive folder [here](https://drive.google.com/drive/folders/1g4NHb75PtUcHunHAImuzkCfoDhdFXWoR?usp=sharing), request access to the drive if you need to use the haptic interface.
-4. Compile the raptor_api_interfaces:
-    ```bash
-    colcon build --packages-select raptor_api_interfaces
-    ```
-    and build the workspace
+3. Copy the `desktop_6D_n65.param` in `/etc/Haption/Connector`. Create the missing folders if needed. The parameters file is stored in the IDRA drive folder [here](https://drive.google.com/drive/folders/1g4NHb75PtUcHunHAImuzkCfoDhdFXWoR?usp=sharing), request access to the drive if you need to use the haptic interface.  
+4. Build the workspace
     ```bash
     colcon build --symlink-install
     ```
-5. Update LD_LIBRARY_PATH so that it includes the path to `src/haption_raptor_api/Dependencies/RaptorAPI/bin/Linux/glibc-<version>`  
-    ```
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path_to_ws>/src/haption_raptor_api/Dependencies/RaptorAPI/bin/Linux/glibc-<version>
-    ```
-6. Source the workspace:
-    ```bash
-    source <path_to_ws>/install/local_setup.bash
-    ```
-7. Enter **sudo mode** and run the entrypoint.sh script:
+5. Enter **sudo mode** and run the entrypoint.sh script:
     ```bash
     sudo su
     source entrypoint.sh
     ```
-8. Start the RaptorAPIWrapper node by calling 
+6. Start the RaptorAPIWrapper node by calling 
     ```bash
-    ./start_RaptorAPIWrapper.sh
+    ros2 run haption_raptor_api raptor_api_wrapper 
     ```
-9. Calibrate the robot if it was not already calibrated (in another sudo shell):
-    - Edit the `test_calibration/parameters.yaml` according to your network setup
-    - Check that the green `calibration/force feedback` button is not pressed otherwise press it again.
-    - Run the calibration node by calling 
-        ```bash
-        ./start_TestCalibration.sh
-        ```
-    - When you read `C_WAITINGFORPOWER: P_NOPOWER` in the RaptorAPIWrapper terminal, press the green `calibration/force feedback` button on the haptic device to power it on.
-    You will see the haptic device moving to the calibration position.
-10. Run the impedance node (in another sudo shell):
-    - Edit the `test_impedance/parameters.yaml` according to your network setup
-    - Run 
-        ```bash
-        ./start_TestImpedance.sh
-        ```
-    Or run the admittance node (in another sudo shell):
-    - Edit the `test_admittance/parameters.yaml` according to your network setup
-    - Run 
-        ```bash
-        ./start_TestAdmittance.sh
-        ```
 ## Ethernet configuration
 The computer must be connected via ethernet to the haptic device black box. The network interface used must have the `192.168.100.50` IP address. In Ubuntu you can set this IP from `Settings -> Network -> Select the right network interface -> Click the gear -> IPv4` and set
 - Address: `192.168.100.50`
 - Netmask: `255.255.255.0`
-## Robot teleoperation
+
+## Run the examples
+#### Calibration
+Calibrate the robot if it was not already calibrated (in another sudo shell):
+  - Edit the `test_calibration/parameters.yaml` according to your network setup
+  - Check that the green `calibration/force feedback` button is not pressed otherwise press it again.
+  - Run the calibration node by calling 
+    ```bash
+    ros2 run test_calibration test_calibration --ros-args --params-file ./src/test_calibration/config/parameters.yaml
+    ```
+  - When you read `C_WAITINGFORPOWER: P_NOPOWER` in the RaptorAPIWrapper terminal, press the green `calibration/force feedback` button on the haptic device to power it on.
+    You will see the haptic device moving to the calibration position.
+#### Impedance control
+. Run the impedance node (in another sudo shell):
+- Edit the `test_impedance/parameters.yaml` according to your network setup
+- Run 
+    ```bash
+    ros2 run test_impedance test_impedance --ros-args --params-file ./src/test_impedance/config/parameters.yaml
+    ```
+#### Admittance control
+Or run the admittance node (in another sudo shell):
+- Edit the `test_admittance/parameters.yaml` according to your network setup
+- Run 
+    ```bash
+    ros2 run test_impedance test_impedance --ros-args --params-file ./src/test_impedance/config/parameters.yaml
+    ```
+
+
+
+## Robot teleoperation sample
 The haptic interface can be used to command a target pose and the resulting force measured by the robot can be
-exerted by the haptic interface through the `haptic_control` node. Also a safe XYZ cartesian position zone limit is implemented. Limits can be changes modifyng the parameters in `haptic_control/parameters.yaml`.
-Finally run
+exerted by the haptic interface through the `haptic_control` package that I implemented. Check `haptic_control/parameters.yaml` for the list of parameters.
 ```bash
-./haptic_control.sh
+ros2 launch haptic_control sample_teleoperation.launch.py 
+```
+## Mesh Virtual Fixtures control
+An implementation of the algorithm presented [here](https://ieeexplore.ieee.org/document/9341590/) is implemented.
+### Requirements
+- Open3D C++
+### Run the teleoperation with mesh virtual fixtures
+```
+ros2 launch haptic_control haptic_control.launch.py use_fixtures:=true
+``` 
+### Delay simulation
+A delay simulation is implemented and can be tested with
+```
+ros2 launch haptic_control haptic_control.launch.py use_fixtures:=true delay:=0.4
 ```
 # Trouble shooting
 - If you get this error `HAPTION::RaptorAPI::StartLogging() failed with error 13` you probably did not sourced `entrypoint.sh`

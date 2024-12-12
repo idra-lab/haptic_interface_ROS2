@@ -13,6 +13,7 @@
 #include "raptor_api_interfaces/msg/out_virtuose_pose.hpp"
 #include "raptor_api_interfaces/msg/out_virtuose_speed.hpp"
 #include "raptor_api_interfaces/msg/out_virtuose_status.hpp"
+#include "raptor_api_interfaces/srv/virtuose_calibrate.hpp"
 #include "raptor_api_interfaces/srv/virtuose_impedance.hpp"
 #include "raptor_api_interfaces/srv/virtuose_reset.hpp"
 
@@ -40,17 +41,23 @@ class SystemInterface : public rclcpp::Node {
     wrench_publisher_ =
         this->create_publisher<raptor_api_interfaces::msg::InVirtuoseForce>(
             "in_virtuose_force", 1);
+    calibration_client_ =
+        this->create_client<raptor_api_interfaces::srv::VirtuoseCalibrate>(
+            "virtuose_calibrate");
     impedance_client_ =
         this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
             "virtuose_impedance");
   }
   void create_connection() {
+    auto cal = std::make_shared<
+        raptor_api_interfaces::srv::VirtuoseCalibrate::Request>();
     auto imp = std::make_shared<
         raptor_api_interfaces::srv::VirtuoseImpedance::Request>();
-    imp->channel = "SimpleChannelUDP";
-    imp->ff_device_ip_address = "192.168.100.53";
-    imp->ff_device_param_file = "/etc/Haption/Connector/desktop_6D_n65.param";
-    imp->local_ip_address = "192.168.100.50";
+    imp->channel = cal->channel = "SimpleChannelUDP";
+    imp->ff_device_ip_address = cal->ff_device_ip_address = "192.168.100.53";
+    imp->ff_device_param_file = cal->ff_device_param_file =
+        "/etc/Haption/Connector/desktop_6D_n65.param";
+    imp->local_ip_address = cal->local_ip_address = "192.168.100.50";
 
     imp->base_frame.translation.x = 0.0;
     imp->base_frame.translation.y = 0.0;
@@ -61,24 +68,57 @@ class SystemInterface : public rclcpp::Node {
     imp->base_frame.rotation.z = q_haptic_base_to_robot_base_.z();
     imp->base_frame.rotation.w = q_haptic_base_to_robot_base_.w();
 
-    while (!impedance_client_->wait_for_service(
+    while (!calibration_client_->wait_for_service(
         std::literals::chrono_literals::operator""s(1))) {
       if (!rclcpp::ok()) {
-        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                     "Interrupted while waiting for the service. Exiting.");
+        RCLCPP_ERROR(
+            rclcpp::get_logger("rclcpp"),
+            "Interrupted while waiting for the calibration service. Exiting.");
         return;
       }
       RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-                  "service not available, waiting again...");
+                  "Calibration service not available, waiting again...");
     }
-
-    auto result = impedance_client_->async_send_request(imp);
+    auto calibration_result = calibration_client_->async_send_request(cal);
+    bool success = false;
     // Wait for the result.
     if (rclcpp::spin_until_future_complete(this->get_node_base_interface(),
-                                           result) ==
+                                           calibration_result) ==
+        rclcpp::FutureReturnCode::SUCCESS) {
+      success = calibration_result.get()->success;
+      RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Calibration result: %d",
+                  success);
+      // return;
+    } else {
+      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
+                   "Failed to call service calibration");
+      rclcpp::shutdown();
+    }
+
+    if (!success) {
+      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to calibrate!");
+      rclcpp::shutdown();
+    }
+
+    while (!impedance_client_->wait_for_service(
+        std::literals::chrono_literals::operator""s(1))) {
+      if (!rclcpp::ok()) {
+        RCLCPP_ERROR(
+            rclcpp::get_logger("rclcpp"),
+            "Interrupted while waiting for the impedance service. Exiting.");
+        return;
+      }
+      RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+                  "Impedance service not available, waiting again...");
+    }
+
+    auto impedance_result = impedance_client_->async_send_request(imp);
+    // Wait for the result.
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(),
+                                           impedance_result) ==
         rclcpp::FutureReturnCode::SUCCESS) {
       // Store client_ ID given by virtuose_node
-      client__id_ = result.get()->client_id;
+      client__id_ = impedance_result.get()->client_id;
       RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client_ ID is: %d",
                   client__id_);
     } else {
@@ -181,6 +221,8 @@ class SystemInterface : public rclcpp::Node {
       pose_subscriber_;
   rclcpp::Client<raptor_api_interfaces::srv::VirtuoseImpedance>::SharedPtr
       impedance_client_;
+  rclcpp::Client<raptor_api_interfaces::srv::VirtuoseCalibrate>::SharedPtr
+      calibration_client_;
   rclcpp::TimerBase::SharedPtr set_target_wrench_timer_;
 };
 

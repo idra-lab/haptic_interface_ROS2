@@ -1,5 +1,9 @@
-#ifndef HAPTIC_CONTROL_HPP
-#define HAPTIC_CONTROL_HPP
+/*
+Sample example of teleoperation using haptic device and force feedback
+@Author: Davide Nardi
+*/
+#ifndef SAMPLE_TELEOPERATION_HPP
+#define SAMPLE_TELEOPERATION_HPP
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -25,6 +29,7 @@
 #include "raptor_api_interfaces/msg/out_virtuose_pose.hpp"
 #include "raptor_api_interfaces/msg/out_virtuose_speed.hpp"
 #include "raptor_api_interfaces/msg/out_virtuose_status.hpp"
+#include "raptor_api_interfaces/srv/virtuose_calibrate.hpp"
 #include "raptor_api_interfaces/srv/virtuose_impedance.hpp"
 #include "raptor_api_interfaces/srv/virtuose_reset.hpp"
 
@@ -75,7 +80,9 @@ class HapticControl : public rclcpp::Node {
       _in_virtuose_force;
   // ROS2 service client_s
   rclcpp::Client<raptor_api_interfaces::srv::VirtuoseImpedance>::SharedPtr
-      client_;
+      impedance_client_;
+  rclcpp::Client<raptor_api_interfaces::srv::VirtuoseCalibrate>::SharedPtr
+      calibration_client_;
   // ROS2 timers
   rclcpp::TimerBase::SharedPtr pose_update_timer_;
   rclcpp::TimerBase::SharedPtr impedanceThread_;
@@ -110,7 +117,6 @@ class HapticControl : public rclcpp::Node {
   std::string ft_link_name_;
   bool received_haptic_pose_;
   bool received_ee_pose_;
-  bool use_limits_;
   bool enable_safety_sphere_, enable_safety_box_;
   // Storage for virtuose_node status
   int64_t status_date_sec_;
@@ -131,4 +137,4 @@ class HapticControl : public rclcpp::Node {
   Eigen::Vector3d x_tilde_old_, x_tilde_new_;
 };
 
-#endif  // HAPTIC_CONTROL_HPP
+#endif  // SAMPLE_TELEOPERATION_HPP

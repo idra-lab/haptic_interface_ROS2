@@ -1,6 +1,11 @@
+/*
+Teleoperation node using haptic device and force feedback which implements the
+mesh virtual fixtures explained in the paper
+https://ieeexplore.ieee.org/document/9341590/
+@Author: Davide Nardi
+*/
 #ifndef __HAPTIC_CONTROL_BASE__
 #define __HAPTIC_CONTROL_BASE__
-
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
@@ -23,7 +28,7 @@
 #include "circular_buffer.hpp"
 #include "system_interface.hpp"
 #include "utils.hpp"
-#include "vf/vf_enforcer.hpp"
+#include "mesh_virtual_fixtures/vf_enforcer.hpp"
 
 class HapticControlBase : public rclcpp::Node {
  public:
@@ -98,7 +103,6 @@ class HapticControlBase : public rclcpp::Node {
   std::string ft_link_name_;
   bool received_haptic_pose_;
   bool received_ee_pose_;
-  bool use_limits_;
   bool enable_safety_sphere_, enable_safety_box_;
   // delay simulation
   double delay_;

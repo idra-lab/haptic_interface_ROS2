@@ -4,11 +4,12 @@ haptic_control:
     ff_device_ip_address: "192.168.100.53"
     ff_device_param_file: "/etc/Haption/Connector/desktop_6D_n65.param"
     local_ip_address: "192.168.100.50"
-    max_force_: 6.0
-    # robot position safety limits
-    enable_safety_sphere: true
+    haptic_control_rate: 1000.0
+    ft_sensor_rate: 500.0
+    max_force: 6.0 # Newton
+
+    enable_safety_sphere: false
     safety_sphere_radius: 0.48
-    use_limits: false
     min_x:  -100.0
     max_x:  100.0
     min_y:  -100.0
@@ -24,10 +25,20 @@ haptic_control:
 
     tool_link_name: "probe"
     base_link_name: "base_link"
-    ft_link_name: "ft_sensor0_wrench"
+    ft_link_name: "tool0"
+    delay: 0.0 # round trip simulated delay in seconds (0.0 for no delay)
     force_scale : 0.3
-    # safety box that can be activated (centered in the current ee position)
+    # safety box that can be activated (centered in the current ee position) -> Not implemented yet
     enable_safety_box: false 
     safety_box_length: 0.2
     safety_box_width: 0.2
     safety_box_height: 0.2
+
+    # vf parameters:
+    mesh_type: "sphere" # knot, sphere, file, bunny 
+    output_mesh_path : "/home/zotac01/virtual_fixture_vis.obj" # path to save the output mesh for Rviz visualization
+    input_mesh_path: "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/final_vf.obj" # path to the input mesh if mesh_type is file
+    skin_mesh_path: "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/skin_mesh.obj" # path to the skin mesh if mesh_type is file
+    radius: 0.005 # radius of the end effector sphere
+    lookup_area: 0.006 # should be at least 2*radius
+    plane_size: 0.001 # plane size used to visualize active constraints in rviz

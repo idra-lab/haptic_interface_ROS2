@@ -3,7 +3,7 @@
 
 #include <Eigen/Dense>
 #include <cmath>
-#include "vf/location.hpp"
+#include "mesh_virtual_fixtures/location.hpp"
 
 double round_up(const double value, const int decimal_places) {
   const double multiplier = std::pow(10.0, decimal_places);

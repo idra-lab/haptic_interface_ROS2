@@ -1,3 +1,9 @@
+/*
+Teleoperation node using haptic device and force feedback which implements the
+mesh virtual fixtures explained in the paper
+https://ieeexplore.ieee.org/document/9341590/
+@Author: Davide Nardi
+*/
 #include "haptic_control_base.hpp"
 using namespace Eigen;
 
