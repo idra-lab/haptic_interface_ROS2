@@ -26,7 +26,7 @@ jobs:
 
       # Step 2: Install additional dependencies
       - name: Install Dependencies
-        run: sudo apt-get update && sudo apt-get install -y libpciaccess-dev libomp-dev libgomp1-dev
+        run: sudo apt-get update && sudo apt-get install -y libpciaccess-dev libomp-dev
 
       # Step 4: Build and process each ROS package
       - name: Build and Process ROS Package
