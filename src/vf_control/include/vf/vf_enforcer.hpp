@@ -80,7 +80,7 @@ class VFEnforcer {
                                    o3d_mesh->triangle_normals_);
     this->x_old_ = x_des;
     this->x_des_old = x_des;
-    this->delta_x_ << 0, 0, 0;
+    this->delta_x_ << 0.0, 0.0, 0.0;
 
     visualizer_->update_scene(constraint_planes_, x_des, x_old_, radius_);
   }
@@ -88,8 +88,11 @@ class VFEnforcer {
   Eigen::Vector3d enforce_vf(Eigen::Vector3d x_des) {
     if ((x_des - x_des_old).norm() < 0.0005) {
       // return last delta_x_
-      return Eigen::Vector3d(0, 0, 0);
+      return Eigen::Vector3d(0.0, 0.0, 0.0);
     }
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Enforcing VF since x_des: "
+                                               << x_des.transpose()
+                                               << " x_old: " << x_old_.transpose());
     delta_x_ = compute_vf::enforce_virtual_fixture(*mesh_, x_des, x_old_,
                                                    radius_, constraint_planes_,
                                                    lookup_area_, *visualizer_);

@@ -41,7 +41,11 @@ def generate_launch_description():
     # haptic_wrapper
     haptic_wrapper = TimerAction(
         period=0.0,
-        actions=[Node(package="haption_raptor_api", executable="raptor_api_wrapper")],
+        actions=[Node(package="haption_raptor_api", 
+                      executable="raptor_api_wrapper",
+                      # prefix=['xterm  -fa "Monospace" -fs 14 -e gdb -ex run --args']
+                      )
+        ],
     )
 
     haptic_parameters_calibration = (
@@ -76,6 +80,8 @@ def generate_launch_description():
                 ],
                 remappings=[
                     (
+
+                        # remember to change ft_sensor_rate in the yaml file
                         "bus0/ft_sensor0/ft_sensor_readings/wrench",
                         "/force_torque_sensor_broadcaster/wrench",
                     )
@@ -94,10 +100,10 @@ def generate_launch_description():
         name="rviz2",
         output="screen",
         arguments=["-d", get_package_share_directory("vf_control") + "/rviz/vf.rviz"],
-        # condition=LaunchConfigurationEquals("use_fixtures", "true"),
+        condition=LaunchConfigurationEquals("use_fixtures", "true"),
     )
-    # ld.add_action(haptic_wrapper)
-    # ld.add_action(haptic_calibration_node)
+    ld.add_action(haptic_wrapper)
+    ld.add_action(haptic_calibration_node)
     ld.add_action(vf_node)
-    # ld.add_action(rviz)
+    ld.add_action(rviz)
     return ld

@@ -123,7 +123,7 @@ class TestImpedance : public rclcpp::Node {
         rclcpp::FutureReturnCode::SUCCESS) {
       // Store client ID given by virtuose_node
       client_id = result.get()->client_id;
-      RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client ID is: %ld",
+      RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client ID is: %d",
                   client_id);
     } else {
       RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
@@ -167,9 +167,9 @@ class TestImpedance : public rclcpp::Node {
     }
     _in_virtuose_force->publish(force);
     ctr++;
-    uint64_t dt = get_clock()->now().nanoseconds() -
-                  (long long unsigned int)status_date_sec * 1000000000U +
-                  (long long unsigned int)status_date_nanosec;
+    // uint64_t dt = get_clock()->now().nanoseconds() -
+    //               (long long unsigned int)status_date_sec * 1000000000U +
+    //               (long long unsigned int)status_date_nanosec;
     // Print status every second
     if (ctr % 1000 == 0) {
       // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Status: %llu %d %d %f %f

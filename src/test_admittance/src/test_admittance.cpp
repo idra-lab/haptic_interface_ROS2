@@ -149,7 +149,7 @@ class TestAdmittance : public rclcpp::Node {
         rclcpp::FutureReturnCode::SUCCESS) {
       // Store client ID given by virtuose_node
       client_id = result.get()->client_id;
-      RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client ID is: %ld",
+      RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Our client ID is: %d",
                   client_id);
     } else {
       RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
@@ -206,7 +206,7 @@ class TestAdmittance : public rclcpp::Node {
                   (long long unsigned int)status_date_nanosec;
     // Print status every second
     if (ctr % 1000 == 0) {
-      RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Status: %llu %d %d %f %f %f",
+      RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Status: %lu %d %d %f %f %f",
                   dt, status_state, status_button, cur_pose[0], cur_pose[1],
                   cur_pose[2]);
     }

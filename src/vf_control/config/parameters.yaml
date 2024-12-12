@@ -7,6 +7,8 @@ haptic_control:
     ff_device_ip_address: "192.168.100.53"
     ff_device_param_file: "/etc/Haption/Connector/desktop_6D_n65.param"
     local_ip_address: "192.168.100.50"
+    haptic_control_rate: 1000.0
+    ft_sensor_rate: 500.0
     # vf params
 
     enable_safety_sphere: false
@@ -38,10 +40,10 @@ haptic_control:
 
 # vf parameters:
 #   ros__parameters:
-    mesh_type: "file" # knot, sphere, file, bunny 
+    mesh_type: "sphere" # knot, sphere, file, bunny 
     input_mesh_path: "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/final_vf.obj"
     skin_mesh_path: "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/skin_mesh.obj"
-    output_mesh_path : "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/final_vf2.obj"
+    output_mesh_path : "/home/zotac01/virtual_fixture_vis.obj"
     radius: 0.005
     lookup_area: 0.006 # should be at least 2*radius
     plane_size: 0.001 # plane size used to visualize active constraints in rviz
