@@ -27,7 +27,8 @@ def generate_launch_description():
     )
 
     # SET RIGHT PATH TO YAML
-    params = get_package_share_directory("haptic_control") + "/config/parameters.yaml"
+    haptic_params = get_package_share_directory("haptic_control") + "/config/haptic_parameters.yaml"
+    robot_params = get_package_share_directory("haptic_control") + "/config/ur3e_parameters.yaml"
     
     sample_teleoperation = TimerAction(
         period=1.0,
@@ -37,11 +38,11 @@ def generate_launch_description():
                 executable="sample_teleoperation",
                 # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
-                    ParameterFile(params),
+                    ParameterFile(haptic_params), ParameterFile(robot_params)
                 ],
                 remappings=[
                     (
-                        # remember to change ft_sensor_rate in the yaml file
+                        # remember to set the right ft_sensor_rate in the haptic yaml file
                         "bus0/ft_sensor0/ft_sensor_readings/wrench", # 1 kHz
                         "/force_torque_sensor_broadcaster/wrench", # 0.5 kHz
                     )

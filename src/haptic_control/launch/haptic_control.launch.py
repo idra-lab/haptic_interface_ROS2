@@ -5,31 +5,24 @@ from launch_ros.parameter_descriptions import ParameterFile
 from launch.actions import TimerAction, DeclareLaunchArgument
 from ament_index_python.packages import get_package_share_directory
 from launch.actions import DeclareLaunchArgument
-
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 # PythonExpression
 from launch.conditions import LaunchConfigurationEquals
 
 
-def generate_launch_description():
 
-    ld = LaunchDescription()
 
-    # LOGINFO
-    ld.add_action(
-        DeclareLaunchArgument(
-            "use_fixtures",
-            default_value="false",
-            description="Use this argument to activate the fixtures (true or false)",
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
-            "delay",
-            default_value="0.0",
-            description="Use this argument to simulate a delay in the system (in seconds), use 0.0 for no delay",
-        )
-    )
+launch_args = [
+    DeclareLaunchArgument("delay", default_value="0.0", description="Use this argument to simulate a delay in the system (in seconds), use 0.0 for no delay"),
+    DeclareLaunchArgument("use_fixtures", default_value="false", description="Use this argument to activate the fixtures (true or false)"),
+    DeclareLaunchArgument("robot_type", default_value="ur3e", description="Use this argument to activate the fixtures (true or false)"),
+]
 
+def launch_setup(context):
+    # SET RIGHT PATH TO YAML
+    haptic_params = get_package_share_directory("haptic_control") + "/config/haptic_parameters.yaml"
+    robot_params = get_package_share_directory("haptic_control") + "/config/" + LaunchConfiguration('robot_type').perform(context) + "_parameters.yaml"
+    
     # haptic_wrapper
     haptic_wrapper = TimerAction(
         period=0.0,
@@ -39,9 +32,7 @@ def generate_launch_description():
                       )
         ],
     )
-
-    # SET RIGHT PATH TO YAML
-    params = get_package_share_directory("haptic_control") + "/config/parameters.yaml"
+    
     vf_node = TimerAction(
         period=2.5,
         actions=[
@@ -50,7 +41,7 @@ def generate_launch_description():
                 executable="haptic_control",
                 # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
-                    ParameterFile(params),
+                    ParameterFile(haptic_params), ParameterFile(robot_params),
                     {"use_fixtures": LaunchConfiguration("use_fixtures")},
                     {"delay": LaunchConfiguration("delay")},
                 ],
@@ -78,7 +69,14 @@ def generate_launch_description():
         arguments=["-d", get_package_share_directory("haptic_control") + "/rviz/vf.rviz"],
         condition=LaunchConfigurationEquals("use_fixtures", "true"),
     )
-    ld.add_action(haptic_wrapper)
-    ld.add_action(vf_node)
-    ld.add_action(rviz)
+    return [haptic_wrapper, vf_node, rviz]
+    
+
+
+def generate_launch_description():
+    ld = LaunchDescription(launch_args)
+    opfunc = OpaqueFunction(function = launch_setup)
+    ld.add_action(opfunc)
+    print("A")
+    
     return ld

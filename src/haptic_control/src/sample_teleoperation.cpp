@@ -38,7 +38,7 @@ HapticControl::HapticControl(const std::string &name,
     this->safety_box_length_ = std::numeric_limits<double>::infinity();
     this->safety_box_height_ = std::numeric_limits<double>::infinity();
   }
-
+  this->get_parameter("ft_topic_name", ft_topic_name_);
   this->get_parameter("max_force", max_force_);
   // safety XYZ position zone -> read from config file
   this->force_scale_ = this->get_parameter("force_scale").as_double();
@@ -80,8 +80,7 @@ HapticControl::HapticControl(const std::string &name,
           "in_virtuose_force", 1);
   // create force/wrench subscriber
   ft_subscriber_ = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
-      "bus0/ft_sensor0/ft_sensor_readings/wrench", 1,
-      std::bind(&HapticControl::SetWrenchCB, this, _1));
+      ft_topic_name_, 1, std::bind(&HapticControl::SetWrenchCB, this, _1));
 
   impedance_client_ =
       this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
@@ -415,13 +414,13 @@ void HapticControl::impedanceThread() {
   float alpha = 0;
   force.virtuose_force.force.x =
       force_scale_ * (alpha * old_force_.virtuose_force.force.x +
-             (1 - alpha) * current_wrench_.wrench.force.x);
+                      (1 - alpha) * current_wrench_.wrench.force.x);
   force.virtuose_force.force.y =
       force_scale_ * (alpha * old_force_.virtuose_force.force.y +
-             (1 - alpha) * current_wrench_.wrench.force.y);
+                      (1 - alpha) * current_wrench_.wrench.force.y);
   force.virtuose_force.force.z =
       force_scale_ * (alpha * old_force_.virtuose_force.force.z +
-             (1 - alpha) * current_wrench_.wrench.force.z);
+                      (1 - alpha) * current_wrench_.wrench.force.z);
   // torque omitted for control simplicity
   force.virtuose_force.torque.x =
       0.0;  // 0.2 * (alpha * old_force_.virtuose_force.torque.x + (1 - alpha)

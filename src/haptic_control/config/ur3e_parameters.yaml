@@ -1,0 +1,8 @@
+haptic_control:
+  ros__parameters:
+    tool_link_name: "probe"
+    base_link_name: "base_link"
+    ft_link_name: "tool0"
+    ft_sensor_rate: 500.0
+    ft_topic_name: "/force_torque_sensor_broadcaster/wrench" # UR f/t sensor
+    # ft_topic_name: "bus0/ft_sensor0/ft_sensor_readings/wrench"  -> Bota f/t sensor

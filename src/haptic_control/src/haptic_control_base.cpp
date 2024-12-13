@@ -53,7 +53,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
     this->safety_box_length_ = std::numeric_limits<double>::infinity();
     this->safety_box_height_ = std::numeric_limits<double>::infinity();
   }
-
+  this->get_parameter("ft_topic_name", ft_topic_name_);
   this->get_parameter("max_force", max_force_);
   this->force_scale_ = this->get_parameter("force_scale").as_double();
   this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
@@ -103,8 +103,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
 
   // create force/wrench subscriber
   ft_subscriber_ = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
-      "bus0/ft_sensor0/ft_sensor_readings/wrench", 1,
-      std::bind(&HapticControlBase::store_wrench, this, _1));
+      ft_topic_name_, 1, std::bind(&HapticControlBase::store_wrench, this, _1));
 
   // Set a callback for parameters updates
   // Safety sphere
@@ -140,6 +139,12 @@ HapticControlBase::HapticControlBase(const std::string &name,
   // defines the rotation from the robot base frame to the haptic base frame
   Eigen::Quaterniond q_haptic_base_to_robot_base_(
       Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
+  RCLCPP_INFO(
+      this->get_logger(),
+      "Haptic base to robot base rotation: x: %f | y: %f | z: %f | w: "
+      "%f",
+      q_haptic_base_to_robot_base_.x(), q_haptic_base_to_robot_base_.y(),
+      q_haptic_base_to_robot_base_.z(), q_haptic_base_to_robot_base_.w());
   haptic_device_ =
       std::make_shared<SystemInterface>(q_haptic_base_to_robot_base_);
 

@@ -115,6 +115,7 @@ class HapticControl : public rclcpp::Node {
   std::string tool_link_name_;
   std::string base_link_name_;
   std::string ft_link_name_;
+  std::string ft_topic_name_;
   bool received_haptic_pose_;
   bool received_ee_pose_;
   bool enable_safety_sphere_, enable_safety_box_;
