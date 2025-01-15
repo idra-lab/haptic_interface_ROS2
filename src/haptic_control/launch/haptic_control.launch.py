@@ -45,14 +45,6 @@ def launch_setup(context):
                     {"use_fixtures": LaunchConfiguration("use_fixtures")},
                     {"delay": LaunchConfiguration("delay")},
                 ],
-                remappings=[
-                    (
-
-                        # remember to change ft_sensor_rate in the yaml file
-                        "bus0/ft_sensor0/ft_sensor_readings/wrench",
-                        "/force_torque_sensor_broadcaster/wrench",
-                    )
-                ],
                 # prefix=["xterm -hold -fa 'Monospace' -fs 14 -e "],
                 # output='screen',
                 # emulate_tty=True,
@@ -77,6 +69,5 @@ def generate_launch_description():
     ld = LaunchDescription(launch_args)
     opfunc = OpaqueFunction(function = launch_setup)
     ld.add_action(opfunc)
-    print("A")
     
     return ld

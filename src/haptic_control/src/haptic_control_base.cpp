@@ -53,7 +53,8 @@ HapticControlBase::HapticControlBase(const std::string &name,
     this->safety_box_length_ = std::numeric_limits<double>::infinity();
     this->safety_box_height_ = std::numeric_limits<double>::infinity();
   }
-  this->get_parameter("ft_topic_name", ft_topic_name_);
+  this->get_parameter("ft_feedback_topic_name", ft_feedback_topic_name_);
+  this->get_parameter("target_frame_topic_name", target_frame_topic_name_);
   this->get_parameter("max_force", max_force_);
   this->force_scale_ = this->get_parameter("force_scale").as_double();
   this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
@@ -84,6 +85,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
   // Create a parameter subscriber that can be used to monitor parameter changes
   param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
   this->get_parameter("max_force", max_force_);
+  std::vector<double> base_frame_rot;
 
   // init wrench msg
   current_wrench_.header.frame_id = base_link_name_;
@@ -95,7 +97,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
   current_wrench_.wrench.torque.z = 0.0;
 
   target_frame_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
-      "target_frame", 1);
+      target_frame_topic_name_, 1);
   desired_frame_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
       "desired_frame", 1);
   current_frame_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
@@ -103,7 +105,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
 
   // create force/wrench subscriber
   ft_subscriber_ = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
-      ft_topic_name_, 1, std::bind(&HapticControlBase::store_wrench, this, _1));
+      ft_feedback_topic_name_, 1, std::bind(&HapticControlBase::store_wrench, this, _1));
 
   // Set a callback for parameters updates
   // Safety sphere
@@ -137,8 +139,12 @@ HapticControlBase::HapticControlBase(const std::string &name,
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
   // defines the rotation from the robot base frame to the haptic base frame
-  Eigen::Quaterniond q_haptic_base_to_robot_base_(
-      Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
+  this->get_parameter("base_frame_rotation", base_frame_rot);
+  Eigen::Quaterniond q_haptic_base_to_robot_base_(base_frame_rot[3],
+                                                  base_frame_rot[0],
+                                                  base_frame_rot[1], base_frame_rot[2]);
+  
+      // Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
   RCLCPP_INFO(
       this->get_logger(),
       "Haptic base to robot base rotation: x: %f | y: %f | z: %f | w: "
