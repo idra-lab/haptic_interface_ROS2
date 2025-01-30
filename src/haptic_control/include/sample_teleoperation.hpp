@@ -1,10 +1,14 @@
-#ifndef HAPTIC_CONTROL_HPP
-#define HAPTIC_CONTROL_HPP
+/*
+Sample example of teleoperation using haptic device and force feedback
+@Author: Davide Nardi
+*/
+#ifndef SAMPLE_TELEOPERATION_HPP
+#define SAMPLE_TELEOPERATION_HPP
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
-#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 
 #include <Eigen/Core>
@@ -25,6 +29,7 @@
 #include "raptor_api_interfaces/msg/out_virtuose_pose.hpp"
 #include "raptor_api_interfaces/msg/out_virtuose_speed.hpp"
 #include "raptor_api_interfaces/msg/out_virtuose_status.hpp"
+#include "raptor_api_interfaces/srv/virtuose_calibrate.hpp"
 #include "raptor_api_interfaces/srv/virtuose_impedance.hpp"
 #include "raptor_api_interfaces/srv/virtuose_reset.hpp"
 
@@ -34,7 +39,7 @@ using std::placeholders::_2;
 using namespace std::chrono_literals;
 
 class HapticControl : public rclcpp::Node {
-public:
+ public:
   HapticControl(const std::string &name = "haptic_control",
                 const std::string &namespace_ = "",
                 const rclcpp::NodeOptions &options =
@@ -53,12 +58,12 @@ public:
       const raptor_api_interfaces::msg::OutVirtuosePose::SharedPtr msg);
   void out_virtuose_statusCB(
       const raptor_api_interfaces::msg::OutVirtuoseStatus::SharedPtr msg);
-  void call_impedance_service();
+  void callImpedanceService();
   void impedanceThread();
-  void project_target_on_sphere(Eigen::Vector3d &target_position_vec,
-                                double safety_sphere_radius_);
+  void projectTargetOnSphere(Eigen::Vector3d &target_position_vec,
+                             double safety_sphere_radius_);
 
-private:
+ private:
   // ROS2 subscribtions
   rclcpp::Subscription<raptor_api_interfaces::msg::OutVirtuoseStatus>::SharedPtr
       out_virtuose_status_;
@@ -75,7 +80,9 @@ private:
       _in_virtuose_force;
   // ROS2 service client_s
   rclcpp::Client<raptor_api_interfaces::srv::VirtuoseImpedance>::SharedPtr
-      client_;
+      impedance_client_;
+  rclcpp::Client<raptor_api_interfaces::srv::VirtuoseCalibrate>::SharedPtr
+      calibration_client_;
   // ROS2 timers
   rclcpp::TimerBase::SharedPtr pose_update_timer_;
   rclcpp::TimerBase::SharedPtr impedanceThread_;
@@ -108,9 +115,9 @@ private:
   std::string tool_link_name_;
   std::string base_link_name_;
   std::string ft_link_name_;
+  std::string ft_topic_name_;
   bool received_haptic_pose_;
   bool received_ee_pose_;
-  bool use_limits_;
   bool enable_safety_sphere_, enable_safety_box_;
   // Storage for virtuose_node status
   int64_t status_date_sec_;
@@ -131,4 +138,4 @@ private:
   Eigen::Vector3d x_tilde_old_, x_tilde_new_;
 };
 
-#endif // HAPTIC_CONTROL_HPP
+#endif  // SAMPLE_TELEOPERATION_HPP

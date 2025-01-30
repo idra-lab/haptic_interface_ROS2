@@ -6,17 +6,15 @@
 #include "location.hpp"
 
 using namespace std::chrono_literals;
-class Visualizer
-{
-public:
+class Visualizer {
+ public:
   std::shared_ptr<rclcpp::Node> node_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
       marker_pub_;
   std::string reference_frame_;
   double plane_size_;
 
-  void InitMsg(visualization_msgs::msg::Marker &marker)
-  {
+  void init_msg(visualization_msgs::msg::Marker &marker) {
     marker.header.frame_id = reference_frame_;
     marker.header.stamp = node_->now();
     marker.id = 0;
@@ -35,31 +33,30 @@ public:
     marker.color.a = 1.0;
     marker.pose.orientation.w = 1.0;
   }
-  void AddMesh(std::string path, int id)
-  {
+  void add_mesh(std::string path, int id) {
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
-    InitMsg(marker);
+    init_msg(marker);
     marker.id = id;
     marker.ns = "mesh";
     marker.mesh_resource = "file://" + path;
     marker.color.a = 1.0;
     marker_array.markers.push_back(marker);
-    for (int i = 0; i < 20; i++)
-    {
+    for (int i = 0; i < 20; i++) {
       marker_pub_->publish(marker_array);
       rclcpp::sleep_for(100ms);
     }
   }
-  void AddPatientMesh(std::string output_mesh_path,
-                      std::string skin_mesh_path)
-  {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Adding rib case mesh with path: " << output_mesh_path);
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Adding skin mesh with path: " << skin_mesh_path);
+  void add_patient_mesh(std::string output_mesh_path,
+                        std::string skin_mesh_path) {
+    RCLCPP_INFO_STREAM(node_->get_logger(),
+                       "Adding rib case mesh with path: " << output_mesh_path);
+    RCLCPP_INFO_STREAM(node_->get_logger(),
+                       "Adding skin mesh with path: " << skin_mesh_path);
 
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
-    InitMsg(marker);
+    init_msg(marker);
     marker.ns = "patient";
     // add skin mesh
     marker.id = 0;
@@ -73,18 +70,18 @@ public:
     marker.color.b = 0.0;
     marker.color.g = 0.0;
     marker_array.markers.push_back(marker);
-    for (int i = 0; i < 20; i++)
-    {
+    for (int i = 0; i < 20; i++) {
       marker_pub_->publish(marker_array);
       rclcpp::sleep_for(100ms);
     }
     RCLCPP_INFO(node_->get_logger(), "Mesh visualization completed");
   }
-  void DrawClosestPoints(std::unordered_map<int, std::pair<Eigen::Vector3d, Location>> &points, double radius)
-  {
+  void draw_closest_points(
+      std::unordered_map<int, std::pair<Eigen::Vector3d, Location>> &points,
+      double radius) {
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
-    InitMsg(marker);
+    init_msg(marker);
     marker.ns = "CP";
     marker.action = visualization_msgs::msg::Marker::DELETEALL;
     marker_array.markers.push_back(marker);
@@ -96,23 +93,18 @@ public:
     marker.scale.z = radius;
     // iterating over the map
     int it = 0;
-    for (auto [i, point] : points)
-    {
+    for (auto [i, point] : points) {
       marker.id = it++;
-      if (point.second == Location::IN)
-      {
+      if (point.second == Location::IN) {
         marker.color.r = 1.0;
         marker.color.g = 0.0;
         marker.color.b = 0.0;
-      }
-      else if (point.second == Location::V1 || point.second == Location::V2 || point.second == Location::V3)
-      {
+      } else if (point.second == Location::V1 || point.second == Location::V2 ||
+                 point.second == Location::V3) {
         marker.color.r = 0.0;
         marker.color.g = 1.0;
         marker.color.b = 0.0;
-      }
-      else
-      {
+      } else {
         // on edge
         marker.color.r = 0.0;
         marker.color.g = 0.0;
@@ -126,12 +118,10 @@ public:
     marker_pub_->publish(marker_array);
   }
 
-  void UpdateScene(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>
-                       constraint_planes,
-                   Eigen::Vector3d target, Eigen::Vector3d vf_pose,
-                   double radius)
-  {
-
+  void update_scene(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>
+                        constraint_planes,
+                    Eigen::Vector3d target, Eigen::Vector3d vf_pose,
+                    double radius) {
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::Marker marker;
     marker.header.frame_id = reference_frame_;
@@ -175,8 +165,7 @@ public:
     marker.color.b = 0.0;
     marker.color.a = 1.0;
     Eigen::Vector3d z_axis(0.0, 0.0, 1.0);
-    for (size_t i = 0; i < constraint_planes.size(); i++)
-    {
+    for (size_t i = 0; i < constraint_planes.size(); i++) {
       auto n = constraint_planes[i].first;
       n = n.normalized();
       auto p = constraint_planes[i].second;
@@ -196,12 +185,14 @@ public:
     }
     marker_pub_->publish(marker_array);
   }
-  Visualizer(std::shared_ptr<rclcpp::Node> node, std::string reference_frame, double plane_size)
-      : node_(node), reference_frame_(reference_frame), plane_size_(plane_size)
-  {
+  Visualizer(std::shared_ptr<rclcpp::Node> node, std::string reference_frame,
+             double plane_size)
+      : node_(node),
+        reference_frame_(reference_frame),
+        plane_size_(plane_size) {
     marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
         "visualization_marker", 1);
   }
 };
 
-#endif // VISUALIZATION_HPP
+#endif  // VISUALIZATION_HPP

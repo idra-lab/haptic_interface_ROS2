@@ -1,130 +1,73 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration
 from launch_ros.parameter_descriptions import ParameterFile
-from launch.actions import TimerAction
+from launch.actions import TimerAction, DeclareLaunchArgument
 from ament_index_python.packages import get_package_share_directory
+from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+# PythonExpression
+from launch.conditions import LaunchConfigurationEquals
 
-import time
-import sys
 
 
 
+launch_args = [
+    DeclareLaunchArgument("delay", default_value="0.0", description="Use this argument to simulate a delay in the system (in seconds), use 0.0 for no delay"),
+    DeclareLaunchArgument("use_fixtures", default_value="false", description="Use this argument to activate the fixtures (true or false)"),
+    DeclareLaunchArgument("robot_type", default_value="ur3e", description="Use this argument to activate the fixtures (true or false)"),
+]
 
-#################### NODE FOR CALLING CALIBRATION HAPTIC DEVICE #################
-import rclpy
-from rclpy.node import Node as RCLNode
-from rokubimini_msgs.srv import ResetWrench
-
-class FTReset(RCLNode):
-    def __init__(self):
-        super().__init__('reset_wrench')
-        self.cli = self.create_client(ResetWrench, '/bus0/ft_sensor0/reset_wrench')
-        while not self.cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service not available, waiting again...')
-        self.req = ResetWrench.Request()
-
-    def send_request(self):
-        self.req.desired_wrench.force.x = 0.0
-        self.req.desired_wrench.force.y = 0.0
-        self.req.desired_wrench.force.z = 0.0
-        self.req.desired_wrench.torque.x = 0.0
-        self.req.desired_wrench.torque.y = 0.0
-        self.req.desired_wrench.torque.z = 0.0
-        self.future = self.cli.call_async(self.req)
-        rclpy.spin_until_future_complete(self, self.future)
-        return self.future.result()
+def launch_setup(context):
+    # SET RIGHT PATH TO YAML
+    haptic_params = get_package_share_directory("haptic_control") + "/config/haptic_parameters.yaml"
+    robot_params = get_package_share_directory("haptic_control") + "/config/" + LaunchConfiguration('robot_type').perform(context) + "_parameters.yaml"
     
-################################################################################
-
-
-
-################################################################################
-######################## LAUNCH DESCRIPTION ####################################
-################################################################################
-
-def generate_launch_description():
-    
-    ld = LaunchDescription()
-
-    print("\033[92m"+
-    "  _____                _         _                  \n"+
-    " |  __ \              | |       | |                 \n"+
-    " | |__) |___  __ _  __| |_   _  | |_ ___            \n"+
-    " |  _  // _ \/ _` |/ _` | | | | | __/ _ \           \n"+
-    " | | \ \  __/ (_| | (_| | |_| | | || (_) |          \n"+
-    " |_|  \_\___|\__,_|\__,_|\__, |  \__\___/   _       \n"+
-    " | |     | |              __/ |            | |      \n"+
-    " | |_ ___| | ___  ___  _ |___/___ _ __ __ _| |_ ___ \n"+
-    " | __/ _ \ |/ _ \/ _ \| '_ \ / _ \ '__/ _` | __/ _ \ \n"+
-    " | ||  __/ |  __/ (_) | |_) |  __/ | | (_| | ||  __/\n"+
-    "  \__\___|_|\___|\___/| .__/ \___|_|  \__,_|\__\___|\n"
-    "                      | |                           \n"+
-    "                      |_|                           \n\033[00m")
-
-
-    ############################## HAPTIC DEVICE CALIBRATION ###################
-    print("\n\n\n\033[93m WARNING: ROBOT MUST NOT BE IN CONTACT WITH ANYTHING DURING CALIBRATION\033[00m\n\n")
-    # time.sleep(3)
-    print("\n\n\033[92mRESETTING FORCE SENSOR...\033[00m\n")
-    rclpy.init()
-    reset_wrench_node = FTReset()
-    response = reset_wrench_node.send_request()
-    reset_wrench_node.get_logger().info('\n\n'+str(response))
-    print("Calibration result: "+str(response))
-    while 'success=True' not in str(response):
-        print("\nERROR: Force sensor not reset, trying again...\n")
-        response = reset_wrench_node.send_request()
-        reset_wrench_node.get_logger().info('\n\n'+str(response))
-    reset_wrench_node.destroy_node()
-    rclpy.shutdown()
-
-    print("\n\n\033[91mREMEMBER TO ACTIVATE FORCE FEEDBACK BUTTON ON HAPTIC DEVICE\033[00m\n\n")
-
-    ############################## HAPTIC DEVICE CONTROL NODE ##################
     # haptic_wrapper
     haptic_wrapper = TimerAction(
-        period = 2.0,
-        actions = [Node(
-        package="haption_raptor_api",
-        executable="raptor_api_wrapper"
-        )]
-
+        period=0.0,
+        actions=[Node(package="haption_raptor_api", 
+                      executable="raptor_api_wrapper",
+                      # prefix=['xterm  -fa "Monospace" -fs 14 -e gdb -ex run --args']
+                      )
+        ],
     )
-
-    haptic_parameters_calibration = get_package_share_directory('test_calibration') + "/config/parameters.yaml"
-    print("CALIBRATION FILE: ",haptic_parameters_calibration)
-
-    # CALIBRATION NODE
-    haptic_calibration_node = TimerAction(
-        period = 2.0,
-        actions = [Node(
-        package="test_calibration",
-        executable="test_calibration",
-        parameters=[ParameterFile(haptic_parameters_calibration)]
-        )]
-    )
-
-    # SET RIGHT PATH TO YAML
-    haptic_parameters_control = get_package_share_directory('haptic_control') + "/config/parameters.yaml"
-
-    haptic_control_node = TimerAction(
-        period=4.0,
+    
+    vf_node = TimerAction(
+        period=2.5,
         actions=[
             Node(
                 package="haptic_control",
                 executable="haptic_control",
                 # remappings=[('/target_frame', '/target_frame_haptic')],
                 parameters=[
-                    ParameterFile(haptic_parameters_control)
-                ]
+                    ParameterFile(haptic_params), ParameterFile(robot_params),
+                    {"use_fixtures": LaunchConfiguration("use_fixtures")},
+                    {"delay": LaunchConfiguration("delay")},
+                ],
+                # prefix=["xterm -hold -fa 'Monospace' -fs 14 -e "],
+                # output='screen',
+                # emulate_tty=True,
+                # arguments=[('__log_level:=debug')]
             )
-        ]
+        ],
     )
+    # load rviz if use_fixtures is true using ifcondition
+    rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="screen",
+        arguments=["-d", get_package_share_directory("haptic_control") + "/rviz/vf.rviz"],
+        condition=LaunchConfigurationEquals("use_fixtures", "true"),
+    )
+    return [haptic_wrapper, vf_node, rviz]
+    
 
 
-    ld.add_action(haptic_wrapper)
-    ld.add_action(haptic_calibration_node)
-    ld.add_action(haptic_control_node)
+def generate_launch_description():
+    ld = LaunchDescription(launch_args)
+    opfunc = OpaqueFunction(function = launch_setup)
+    ld.add_action(opfunc)
+    
     return ld
-
-

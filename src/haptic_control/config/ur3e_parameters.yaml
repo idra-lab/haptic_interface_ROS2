@@ -1,0 +1,10 @@
+haptic_control:
+  ros__parameters:
+    tool_link_name: "probe"
+    base_link_name: "base_link"
+    ft_link_name: "tool0"
+    ft_sensor_rate: 500.0
+    target_frame_topic_name: "/target_frame"
+    base_frame_rotation: [0.0, 0.0, 0.7071068, 0.7071068] # quaternion in the form [x, y, z, w], it is used to align the robot base link with the haptic interface base link
+    ft_feedback_topic_name: "/force_torque_sensor_broadcaster/wrench" # UR f/t sensor
+    # ft_feedback_topic_name: "bus0/ft_sensor0/ft_sensor_readings/wrench"  -> Bota f/t sensor

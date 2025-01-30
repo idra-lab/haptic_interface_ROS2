@@ -1,0 +1,37 @@
+name: Humble CI
+
+on:
+  push:
+    branches:
+      - main
+          
+jobs:
+  humble_source:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        package-name: 
+          - raptor_api_interfaces
+          - haption_raptor_api
+          - test_calibration
+          - test_admittance
+          - test_impedance
+          - haptic_control
+    steps:
+      # Step 1: Set up ROS Humble
+      - name: Setup ROS Humble
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: humble
+
+      # Step 2: Install additional dependencies
+      - name: Install Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpciaccess-dev libomp-dev libc++1  
+
+      # Step 4: Build and process each ROS package
+      - name: Build and Process ROS Package
+        uses: ros-tooling/action-ros-ci@v0.3
+        with:
+          package-name: ${{ matrix.package-name }}
+          target-ros2-distro: humble
+          skip-tests: true
