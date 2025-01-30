@@ -20,3 +20,5 @@ start_full_env.sh
 tcp_endpoint.sh
 **/**.txt
 **/**.ply
+**/**.png
+**/**.pt
