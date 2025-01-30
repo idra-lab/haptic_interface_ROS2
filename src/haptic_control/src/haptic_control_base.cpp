@@ -236,6 +236,7 @@ void HapticControlBase::get_ee_trans(
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                           "End Effector pose not available: %s", ex.what());
   }
+  last_robot_pose_update_time_ = trans.header.stamp;
 }
 
 void HapticControlBase::initialize_haptic_control() {
@@ -338,6 +339,13 @@ void HapticControlBase::control_thread() {
                           "Haptic pose not available");
     return;
   }
+  // Robot data consistency check, compare the time from the last ee pose update
+  if((this->get_clock()->now() - last_robot_pose_update_time_).seconds() > 1.0) {
+    RCLCPP_ERROR(this->get_logger(), "Robot pose not updated in the last second, shutting down");
+    // shutdown the node
+    rclcpp::shutdown();
+  }
+
   // Update the haptic device pose
   if (enable_safety_sphere_) {
     x_tilde_new_ = x_tilde_old_ + (x_new_ - x_old_);

@@ -26,9 +26,9 @@ https://ieeexplore.ieee.org/document/9341590/
 #include "tf2_ros/transform_broadcaster.h"
 
 #include "circular_buffer.hpp"
+#include "mesh_virtual_fixtures/vf_enforcer.hpp"
 #include "system_interface.hpp"
 #include "utils.hpp"
-#include "mesh_virtual_fixtures/vf_enforcer.hpp"
 
 class HapticControlBase : public rclcpp::Node {
  public:
@@ -108,10 +108,12 @@ class HapticControlBase : public rclcpp::Node {
   // delay simulation
   double delay_;
   int delay_loop_haptic_, delay_loop_ft_;
-  double haptic_control_rate_,ft_sensor_rate_;
-//   std::vector<geometry_msgs::msg::WrenchStamped> wrench_history_buffer_;
-    // std::vector<geometry_msgs::msg::PoseStamped> target_pose_history_buffer_,
-    // target_pose_vf_history_buffer_;
+  double haptic_control_rate_, ft_sensor_rate_;
+  // time consistency check
+  rclcpp::Time last_robot_pose_update_time_;
+  //   std::vector<geometry_msgs::msg::WrenchStamped> wrench_history_buffer_;
+  // std::vector<geometry_msgs::msg::PoseStamped> target_pose_history_buffer_,
+  // target_pose_vf_history_buffer_;
   CircularBuffer<geometry_msgs::msg::WrenchStamped> wrench_buffer_;
   CircularBuffer<geometry_msgs::msg::PoseStamped> target_pose_buffer_,
       target_pose_vf_buffer_;
