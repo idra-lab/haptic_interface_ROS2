@@ -9,7 +9,8 @@
 
 class VFEnforcer {
  public:
-  VFEnforcer(std::shared_ptr<rclcpp::Node> node, Eigen::Vector3d x_des) {
+  VFEnforcer(std::shared_ptr<rclcpp::Node> node, Eigen::Vector3d x_des,
+             std::string base_link_name) {
     node_ = node;
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
                 "Starting VF Control node with name vf_control");
@@ -24,7 +25,7 @@ class VFEnforcer {
     this->plane_size_ = node_->get_parameter("plane_size").as_double();
 
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-    visualizer_ = std::make_shared<Visualizer>(node_, "base_link", plane_size_);
+    visualizer_ = std::make_shared<Visualizer>(node_, base_link_name, plane_size_);
 
     if (mesh_type_ == "bunny") {
       open3d::data::BunnyMesh dataset;

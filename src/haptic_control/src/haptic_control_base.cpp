@@ -105,7 +105,8 @@ HapticControlBase::HapticControlBase(const std::string &name,
 
   // create force/wrench subscriber
   ft_subscriber_ = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
-      ft_feedback_topic_name_, 1, std::bind(&HapticControlBase::store_wrench, this, _1));
+      ft_feedback_topic_name_, 1,
+      std::bind(&HapticControlBase::store_wrench, this, _1));
 
   // Set a callback for parameters updates
   // Safety sphere
@@ -140,11 +141,11 @@ HapticControlBase::HapticControlBase(const std::string &name,
 
   // defines the rotation from the robot base frame to the haptic base frame
   this->get_parameter("base_frame_rotation", base_frame_rot);
-  Eigen::Quaterniond q_haptic_base_to_robot_base_(base_frame_rot[3],
-                                                  base_frame_rot[0],
-                                                  base_frame_rot[1], base_frame_rot[2]);
-  
-      // Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
+  Eigen::Quaterniond q_haptic_base_to_robot_base_(
+      base_frame_rot[3], base_frame_rot[0], base_frame_rot[1],
+      base_frame_rot[2]);
+
+  // Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
   RCLCPP_INFO(
       this->get_logger(),
       "Haptic base to robot base rotation: x: %f | y: %f | z: %f | w: "
@@ -170,7 +171,8 @@ void HapticControlBase::init_vf_enforcer() {
       this->shared_from_this(),
       Eigen::Vector3d(haptic_device_->haptic_current_pose_.pose.position.x,
                       haptic_device_->haptic_current_pose_.pose.position.y,
-                      haptic_device_->haptic_current_pose_.pose.position.z));
+                      haptic_device_->haptic_current_pose_.pose.position.z),
+      this->base_link_name_);
 }
 
 void HapticControlBase::enable_safety_sphere_CB(const rclcpp::Parameter &p) {
@@ -340,8 +342,10 @@ void HapticControlBase::control_thread() {
     return;
   }
   // Robot data consistency check, compare the time from the last ee pose update
-  if((this->get_clock()->now() - last_robot_pose_update_time_).seconds() > 1.0) {
-    RCLCPP_ERROR(this->get_logger(), "Robot pose not updated in the last second, shutting down");
+  if ((this->get_clock()->now() - last_robot_pose_update_time_).seconds() >
+      1.0) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Robot pose not updated in the last second, shutting down");
     // shutdown the node
     rclcpp::shutdown();
   }

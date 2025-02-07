@@ -15,14 +15,14 @@ from launch.conditions import LaunchConfigurationEquals
 launch_args = [
     DeclareLaunchArgument("delay", default_value="0.0", description="Use this argument to simulate a delay in the system (in seconds), use 0.0 for no delay"),
     DeclareLaunchArgument("use_fixtures", default_value="false", description="Use this argument to activate the fixtures (true or false)"),
-    DeclareLaunchArgument("robot_type", default_value="ur3e", description="Use this argument to activate the fixtures (true or false)"),
+    DeclareLaunchArgument("robot_type", default_value="kuka", description="Use this argument to select the robot type (ur3e, kuka)"),
 ]
 
 def launch_setup(context):
     # SET RIGHT PATH TO YAML
     haptic_params = get_package_share_directory("haptic_control") + "/config/haptic_parameters.yaml"
     robot_params = get_package_share_directory("haptic_control") + "/config/" + LaunchConfiguration('robot_type').perform(context) + "_parameters.yaml"
-    
+
     # haptic_wrapper
     haptic_wrapper = TimerAction(
         period=0.0,

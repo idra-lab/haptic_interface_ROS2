@@ -32,10 +32,10 @@ haptic_control:
     safety_box_height: 0.2
 
     # vf parameters:
-    mesh_type: "sphere" # knot, sphere, file, bunny 
-    output_mesh_path : "/home/zotac01/virtual_fixture_vis.obj" # path to save the output mesh for Rviz visualization
-    input_mesh_path: "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/final_vf.obj" # path to the input mesh if mesh_type is file
-    skin_mesh_path: "/home/zotac01/Ultrasound-Demo/body_modelling/ros2_ws/skin_mesh.obj" # path to the skin mesh if mesh_type is file
+    mesh_type: "file" # knot, sphere, file, bunny 
+    output_mesh_path : "/home/nardi/virtual_fixture_vis.obj" # path to save the output mesh for Rviz visualization
+    input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj" # path to the input mesh if mesh_type is file
+    skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj" # path to the skin mesh if mesh_type is file
     radius: 0.005 # radius of the end effector sphere
     lookup_area: 0.006 # should be at least 2*radius
     plane_size: 0.001 # plane size used to visualize active constraints in rviz
