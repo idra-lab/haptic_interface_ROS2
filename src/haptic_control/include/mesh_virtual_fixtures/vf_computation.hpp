@@ -32,10 +32,10 @@ Eigen::Vector3d enforce_virtual_fixture(
   mesh.find_nearby_triangles(current_position, max_distance, T);
 
   // std::cout << "Nearby triangles: " << T.size() << std::endl;
-  if (T.size() == 0) {
+  // if (T.size() == 0) {
     // No nearby triangles found; return the target position
-    return target_position - current_position;
-  }
+  //   return target_position - current_position;
+  // }
   // std::cout << "Nearby triangles: " << nearby_triangles.size() << std::endl;
 
   // Construct constraints based on nearby triangles
@@ -194,7 +194,7 @@ Eigen::Vector3d enforce_virtual_fixture(
     T.erase(it);
   }
 
-  int n_constraints = constraint_planes.size();
+  const int n_constraints = constraint_planes.size();
   // std::cout << "Found " << n_constraints << " constraints" << std::endl;
 
   // QP
@@ -210,7 +210,9 @@ Eigen::Vector3d enforce_virtual_fixture(
   Eigen::Vector3d delta_x_des = direction.normalized() * step_size;
   Eigen::Vector<real_t, 3> g = -2 * (delta_x_des);
   // constraint matrix
-  Eigen::Vector<real_t, Eigen::Dynamic> A_lb(n_constraints);
+  Eigen::Vector<real_t, Eigen::Dynamic> A_lb(n_constraints);  //,lb(3),ub(3);
+
+  Eigen::Vector<real_t, 3> lb(3);
 
   Eigen::Matrix<real_t, Eigen::Dynamic, 3, Eigen::RowMajor> A(n_constraints, 3);
   for (int i = 0; i < n_constraints; ++i) {
@@ -222,13 +224,23 @@ Eigen::Vector3d enforce_virtual_fixture(
     A(i, 1) = n[1];
     A(i, 2) = n[2];
   }
+
+  // Assuming x is of dimension 3
+  const float max_delta = 0.00001;
+  real_t x_lb[3] = {-max_delta, -max_delta, -max_delta};  // lower bound  
+  real_t x_ub[3] = {max_delta, max_delta, max_delta};     // upper bound
   qpOASES::Options myOptions;
   myOptions.printLevel = qpOASES::PL_LOW;
   qpOASES::QProblem min_problem(3, n_constraints);
   min_problem.setOptions(myOptions);
   Eigen::Vector<real_t, 3> delta_x;
   int nWSR = 200;
-  min_problem.init(H.data(), g.data(), A.data(), 0, 0, A_lb.data(), 0, nWSR);
+  if(n_constraints != 0){
+    min_problem.init(H.data(), g.data(), A.data(), x_lb, x_ub, A_lb.data(), 0, nWSR);
+  }else{
+    min_problem.init(H.data(), g.data(), 0, x_lb, x_ub, 0, 0, nWSR);
+  }
+  // min_problem.init(H.data(), g.data(), A.data(), 0, 0, A_lb.data(), 0, nWSR);
   min_problem.getPrimalSolution(delta_x.data());
   // // std::cout << "delta_x: " << delta_x << std::endl;
 

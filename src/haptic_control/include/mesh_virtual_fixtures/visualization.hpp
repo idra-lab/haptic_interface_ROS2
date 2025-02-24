@@ -66,7 +66,7 @@ class Visualizer {
     // add vf
     marker.mesh_resource = "file://" + output_mesh_path;
     marker.id = 1;
-    marker.color.a = 1.0;
+    marker.color.a = 0.8;
     marker.color.b = 0.0;
     marker.color.g = 0.0;
     marker_array.markers.push_back(marker);

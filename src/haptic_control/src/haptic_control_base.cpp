@@ -167,12 +167,9 @@ HapticControlBase::HapticControlBase(const std::string &name,
 
 void HapticControlBase::init_vf_enforcer() {
   // Init virtual fixture enforcer
-  vf_enforcer_ = std::make_shared<VFEnforcer>(
-      this->shared_from_this(),
-      Eigen::Vector3d(haptic_device_->haptic_current_pose_.pose.position.x,
-                      haptic_device_->haptic_current_pose_.pose.position.y,
-                      haptic_device_->haptic_current_pose_.pose.position.z),
-      this->base_link_name_);
+  vf_enforcer_ = std::make_shared<VFEnforcer>(this->shared_from_this(),
+                                              x_new_,  // initial position
+                                              this->base_link_name_);
 }
 
 void HapticControlBase::enable_safety_sphere_CB(const rclcpp::Parameter &p) {
@@ -284,6 +281,7 @@ void HapticControlBase::initialize_haptic_control() {
       haptic_device_->haptic_starting_pose_.pose.position.y,
       haptic_device_->haptic_starting_pose_.pose.position.z;
   x_old_ = x_tilde_old_ = x_new_;
+  old_target_pose_vf_ = target_pose_vf_ = target_pose_ = ee_starting_position;
 
   // in the case of no delay, the buffer will contain only the last element
   for (int i = 0; i < delay_loop_haptic_; i++) {
@@ -342,13 +340,14 @@ void HapticControlBase::control_thread() {
     return;
   }
   // Robot data consistency check, compare the time from the last ee pose update
-  if ((this->get_clock()->now() - last_robot_pose_update_time_).seconds() >
-      1.0) {
-    RCLCPP_ERROR(this->get_logger(),
-                 "Robot pose not updated in the last second, shutting down");
-    // shutdown the node
-    rclcpp::shutdown();
-  }
+  // if ((this->get_clock()->now() - last_robot_pose_update_time_).seconds() >
+  //     15.0) {
+  //   RCLCPP_ERROR(this->get_logger(),
+  //                "Robot pose not updated in the 5 last seconds, shutting
+  //                down");
+  //   // shutdown the node
+  //   rclcpp::shutdown();
+  // }
 
   // Update the haptic device pose
   if (enable_safety_sphere_) {

@@ -8,6 +8,7 @@ Panels:
         - /Status1
         - /MarkerArray1
         - /RobotModel1
+        - /RobotModel1/Links1
       Splitter Ratio: 0.5
     Tree Height: 1634
   - Class: rviz_common/Selection
@@ -53,7 +54,10 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        {}
+        constraint_planes: true
+        patient: true
+        target_pose: true
+        virtual_fixture: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -61,7 +65,7 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /visualization_marker
       Value: true
-    - Alpha: 1
+    - Alpha: 0.699999988079071
       Class: rviz_default_plugins/RobotModel
       Collision Enabled: false
       Description File: ""
@@ -74,7 +78,7 @@ Visualization Manager:
         Value: /lbr/robot_description
       Enabled: true
       Links:
-        All Links Enabled: true
+        All Links Enabled: false
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
@@ -83,32 +87,7 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
-        ft_sensor0_imu:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        ft_sensor0_mech1:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        ft_sensor0_mech2:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        ft_sensor0_mech3:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        ft_sensor0_mounting:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        ft_sensor0_wrench:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
+          Value: false
         lbr_floating_link:
           Alpha: 1
           Show Axes: false
@@ -117,51 +96,47 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
+          Value: false
         lbr_link_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
+          Value: false
         lbr_link_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
+          Value: false
         lbr_link_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
+          Value: false
         lbr_link_4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
+          Value: false
         lbr_link_5:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
+          Value: false
         lbr_link_6:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
+          Value: false
         lbr_link_7:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
+          Value: false
         lbr_link_ee:
           Alpha: 1
           Show Axes: false
           Show Trail: false
         probe:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        probe_bota:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -182,7 +157,7 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
+          Value: false
         zed2_camera_link:
           Alpha: 1
           Show Axes: false
@@ -269,25 +244,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 2.095228910446167
+      Distance: 0.26873886585235596
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.16261190176010132
-        Y: 0.6333742737770081
-        Z: 0.054343320429325104
-      Focal Shape Fixed Size: true
+        X: 0.6369832158088684
+        Y: -0.06276121735572815
+        Z: 0.5573422312736511
+      Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.514797568321228
+      Pitch: 0.6303985714912415
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.40039798617362976
+      Yaw: 2.960395336151123
     Saved: ~
 Window Geometry:
   Displays:
