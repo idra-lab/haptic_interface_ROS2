@@ -85,8 +85,14 @@ ament_target_dependencies(haptic_control rclcpp raptor_api_interfaces haption_ra
 include_directories(include)
 target_link_libraries(haptic_control Eigen3::Eigen Open3D::Open3D qpoases::qpoases gomp)
 
+add_executable(keyboard_teleoperation test/keyboard_teleoperation.cpp)
+ament_target_dependencies(keyboard_teleoperation rclcpp raptor_api_interfaces haption_raptor_api tf2_ros tf2_geometry_msgs visualization_msgs)
+include_directories(include)
+target_link_libraries(keyboard_teleoperation Eigen3::Eigen Open3D::Open3D qpoases::qpoases gomp)
 
-install(TARGETS ${This} haptic_control sample_teleoperation
+
+
+install(TARGETS ${This} haptic_control sample_teleoperation keyboard_teleoperation
   DESTINATION lib/${PROJECT_NAME})
 
 install(

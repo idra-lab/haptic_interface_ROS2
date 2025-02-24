@@ -21,25 +21,28 @@ class VFEnforcer {
         node_->get_parameter("output_mesh_path").as_string();
     this->skin_mesh_path_ = node_->get_parameter("skin_mesh_path").as_string();
     this->tool_radius_ = node_->get_parameter("tool_radius").as_double();
-    this->tool_radius_vis_ = node_->get_parameter("tool_radius_visualization").as_double();
+    this->tool_radius_vis_ =
+        node_->get_parameter("tool_radius_visualization").as_double();
 
     this->lookup_area_ = node_->get_parameter("lookup_area").as_double();
     this->plane_size_ = node_->get_parameter("plane_size").as_double();
 
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-    visualizer_ = std::make_shared<Visualizer>(node_, base_link_name, plane_size_);
+    visualizer_ =
+        std::make_shared<Visualizer>(node_, base_link_name, plane_size_);
 
     if (mesh_type_ == "bunny") {
       open3d::data::BunnyMesh dataset;
       o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
-      o3d_mesh->Translate(Eigen::Vector3d(0, 0.2, 0));
+      o3d_mesh->Translate(Eigen::Vector3d(0.3, 0.0, 0.5));
     } else if (mesh_type_ == "knot") {
       open3d::data::KnotMesh dataset;
       o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
       o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
+      o3d_mesh->Translate(Eigen::Vector3d(0.3, 0.0, 0.5));
     } else if (mesh_type_ == "sphere") {
-      o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.02, 20);
-      o3d_mesh->Translate(Eigen::Vector3d(0, 0.25, 0));
+      o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 50);
+      o3d_mesh->Translate(Eigen::Vector3d(0.3, 0.0, 0.3));
 
     } else if (mesh_type_ == "file") {
       open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh);
@@ -48,10 +51,11 @@ class VFEnforcer {
       // kdtree.SetGeometry(*o3d_mesh);
       o3d_mesh->ComputeVertexNormals();
       o3d_mesh->ComputeTriangleNormals();
-      for (size_t i = 0; i < o3d_mesh->triangles_.size(); i++)
-      {
-          o3d_mesh->triangle_normals_[i] *= -1;
-          RCLCPP_INFO_STREAM(node->get_logger(), "Triangle normal: " << o3d_mesh->triangle_normals_[i].transpose());
+      for (size_t i = 0; i < o3d_mesh->triangles_.size(); i++) {
+        o3d_mesh->triangle_normals_[i] *= -1;
+        RCLCPP_INFO_STREAM(
+            node->get_logger(),
+            "Triangle normal: " << o3d_mesh->triangle_normals_[i].transpose());
       }
 
       // open3d::visualization::DrawGeometries({o3d_mesh});
@@ -96,23 +100,18 @@ class VFEnforcer {
     this->x_des_old = x_des;
     this->delta_x_ << 0.0, 0.0, 0.0;
 
-    visualizer_->update_scene(constraint_planes_, x_des, x_old_, tool_radius_vis_);
+    visualizer_->update_scene(constraint_planes_, x_des, x_old_,
+                              tool_radius_vis_);
   }
 
   Eigen::Vector3d enforce_vf(Eigen::Vector3d x_des) {
-    // if ((x_des - x_des_old).norm() < 0.0005) {
-    //   // return last delta_x_
-    //   return Eigen::Vector3d(0.0, 0.0, 0.0);
-    // }
-    // RCLCPP_INFO_STREAM(node_->get_logger(), "Enforcing VF since x_des: "
-    //                                            << x_des.transpose()
-    //                                            << " x_old: " << x_old_.transpose());
-    delta_x_ = compute_vf::enforce_virtual_fixture(*mesh_, x_des, x_old_,
-                                                   tool_radius_, constraint_planes_,
-                                                   lookup_area_, *visualizer_);
-    
-  RCLCPP_INFO_STREAM(node_->get_logger(), "Delta x: " << delta_x_.transpose());
-                                                   auto x_new = x_old_ + delta_x_;
+    delta_x_ = compute_vf::enforce_virtual_fixture(
+        *mesh_, x_des, x_old_, tool_radius_, constraint_planes_, lookup_area_,
+        *visualizer_);
+
+    RCLCPP_INFO_STREAM(node_->get_logger(),
+                       "Delta x: " << delta_x_.transpose());
+    auto x_new = x_old_ + delta_x_;
     x_old_ = x_new;
     x_des_old = x_des;
     geometry_msgs::msg::PoseStamped target_pose_vf;
@@ -122,8 +121,10 @@ class VFEnforcer {
     target_pose_vf.pose.position.y = x_new[1];
     target_pose_vf.pose.position.z = x_new[2];
     target_pose_vf.pose.orientation.w = 1.0;
-    visualizer_->update_scene(constraint_planes_, x_des, x_new, tool_radius_vis_);
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Delta x: " << delta_x_.transpose());
+    visualizer_->update_scene(constraint_planes_, x_des, x_new,
+                              tool_radius_vis_);
+    RCLCPP_INFO_STREAM(node_->get_logger(),
+                       "Delta x: " << delta_x_.transpose());
     return delta_x_;
   }
 
