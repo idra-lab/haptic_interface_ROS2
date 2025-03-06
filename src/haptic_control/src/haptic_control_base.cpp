@@ -414,10 +414,13 @@ void HapticControlBase::control_thread() {
   }
   target_pose_buffer_.push(target_pose_);
 
+  geometry_msgs::msg::TransformStamped ee_pose;
+  get_ee_trans(ee_pose);
   if (use_fixtures_) {
     Eigen::Vector3d x_desired(target_pose_.pose.position.x,
                               target_pose_.pose.position.y,
                               target_pose_.pose.position.z);
+    // Filter position
     auto delta_x = vf_enforcer_->enforce_vf(x_desired);
     target_pose_vf_.header.stamp = this->get_clock()->now();
     target_pose_vf_.header.frame_id = base_link_name_;
@@ -428,16 +431,41 @@ void HapticControlBase::control_thread() {
         old_target_pose_vf_.pose.position.y + delta_x[1];
     target_pose_vf_.pose.position.z =
         old_target_pose_vf_.pose.position.z + delta_x[2];
-    target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
+
+    // Filter orientation
+    Eigen::Vector3d thetas(0.4, 0.4, 0.4);
+
+    // reference cone orientation
+    Eigen::Quaterniond q_ref(ee_starting_position.pose.orientation.w,
+                             ee_starting_position.pose.orientation.x,
+                             ee_starting_position.pose.orientation.y,
+                             ee_starting_position.pose.orientation.z);
+    q_ref.normalize();
+    // target orientation
+    Eigen::Quaterniond q_new = target_orientation.normalized();
+    q_new.normalize();
+
+    // current target orientation
+    Eigen::Quaterniond q_cur(old_target_pose_vf_.pose.orientation.w,
+                             old_target_pose_vf_.pose.orientation.x,
+                             old_target_pose_vf_.pose.orientation.y,
+                             old_target_pose_vf_.pose.orientation.z);
+    q_cur.normalize();
+
+    Eigen::Quaterniond q_filtered =
+        conic_cbf::cbfOrientFilter(q_ref, q_cur, q_new, thetas, 0.001);
+
+    target_pose_vf_.pose.orientation.x = q_filtered.x();
+    target_pose_vf_.pose.orientation.y = q_filtered.y();
+    target_pose_vf_.pose.orientation.z = q_filtered.z();
+    target_pose_vf_.pose.orientation.w = q_filtered.w();
+    // target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
 
     old_target_pose_vf_ = target_pose_vf_;
-
     target_pose_vf_buffer_.push(target_pose_vf_);
   }
 
   // Publish the current ee pose
-  geometry_msgs::msg::TransformStamped ee_pose;
-  get_ee_trans(ee_pose);
   geometry_msgs::msg::PoseStamped ee_pose_msg;
   ee_pose_msg.header.stamp = ee_pose.header.stamp;
   ee_pose_msg.header.frame_id = base_link_name_;

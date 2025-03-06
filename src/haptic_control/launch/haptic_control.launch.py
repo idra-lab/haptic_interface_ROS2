@@ -45,10 +45,10 @@ def launch_setup(context):
                     {"use_fixtures": LaunchConfiguration("use_fixtures")},
                     {"delay": LaunchConfiguration("delay")},
                 ],
-                # prefix=["xterm -hold -fa 'Monospace' -fs 14 -e "],
-                # output='screen',
-                # emulate_tty=True,
-                # arguments=[('__log_level:=debug')]
+                prefix=["xterm -hold -fa 'Monospace' -fs 14 -e "],
+                output='screen',
+                emulate_tty=True,
+                arguments=[('__log_level:=debug')]
             )
         ],
     )

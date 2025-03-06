@@ -27,6 +27,7 @@ https://ieeexplore.ieee.org/document/9341590/
 
 #include "circular_buffer.hpp"
 #include "mesh_virtual_fixtures/vf_enforcer.hpp"
+#include "conic_cbf/conic_cbf.hpp"
 #include "system_interface.hpp"
 
 class HapticControlBase : public rclcpp::Node {
