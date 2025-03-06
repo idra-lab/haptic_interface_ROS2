@@ -109,8 +109,6 @@ class VFEnforcer {
         *mesh_, x_des, x_old_, tool_radius_, constraint_planes_, lookup_area_,
         *visualizer_);
 
-    RCLCPP_INFO_STREAM(node_->get_logger(),
-                       "Delta x: " << delta_x_.transpose());
     auto x_new = x_old_ + delta_x_;
     x_old_ = x_new;
     x_des_old = x_des;
@@ -123,8 +121,6 @@ class VFEnforcer {
     target_pose_vf.pose.orientation.w = 1.0;
     visualizer_->update_scene(constraint_planes_, x_des, x_new,
                               tool_radius_vis_);
-    RCLCPP_INFO_STREAM(node_->get_logger(),
-                       "Delta x: " << delta_x_.transpose());
     return delta_x_;
   }
 

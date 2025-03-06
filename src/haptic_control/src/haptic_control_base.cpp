@@ -167,8 +167,11 @@ HapticControlBase::HapticControlBase(const std::string &name,
 
 void HapticControlBase::init_vf_enforcer() {
   // Init virtual fixture enforcer
+  Eigen::Vector3d x_desired(target_pose_.pose.position.x,
+                            target_pose_.pose.position.y,
+                            target_pose_.pose.position.z);
   vf_enforcer_ = std::make_shared<VFEnforcer>(this->shared_from_this(),
-                                              x_new_,  // initial position
+                                              x_desired,
                                               this->base_link_name_);
 }
 
