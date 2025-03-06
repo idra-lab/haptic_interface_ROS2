@@ -75,7 +75,7 @@ class Mesh {
     triangle_xfm_inv.resize(faces.size());
 #pragma omp parallel for
     for (size_t i = 0; i < faces.size(); ++i) {
-      std::cout << i << "/" << faces.size() << std::endl;
+      // std::cout << i << "/" << faces.size() << std::endl;
       triangle_xfm[i] = compute_triangle_xfm(i);
       triangle_xfm_inv[i] = triangle_xfm[i].inverse();
     }
@@ -162,7 +162,7 @@ class Mesh {
         adjacency_dict;
 #pragma omp parallel for
     for (size_t i = 0; i < faces.size(); ++i) {
-      std::cout << i << "/" << faces.size() << std::endl;
+      // std::cout << i << "/" << faces.size() << std::endl;
       for (Location location :
            {Location::V1, Location::V2, Location::V3, Location::V1V2,
             Location::V1V3, Location::V2V3}) {

@@ -103,6 +103,7 @@ class HapticControlBase : public rclcpp::Node {
   std::string target_frame_topic_name_, ft_feedback_topic_name_;
   bool received_haptic_pose_;
   bool received_ee_pose_;
+  bool first_control_loop_ = true;
   bool enable_safety_sphere_, enable_safety_box_;
   // delay simulation
   double delay_;

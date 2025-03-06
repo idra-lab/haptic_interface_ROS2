@@ -12,20 +12,18 @@ class VFEnforcer {
   VFEnforcer(std::shared_ptr<rclcpp::Node> node, Eigen::Vector3d x_des,
              std::string base_link_name) {
     node_ = node;
+
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
                 "Starting VF Control node with name vf_control");
-    this->mesh_type_ = node_->get_parameter("mesh_type").as_string();
-    this->input_mesh_path_ =
-        node_->get_parameter("input_mesh_path").as_string();
-    this->output_mesh_path_ =
-        node_->get_parameter("output_mesh_path").as_string();
-    this->skin_mesh_path_ = node_->get_parameter("skin_mesh_path").as_string();
-    this->tool_radius_ = node_->get_parameter("tool_radius").as_double();
-    this->tool_radius_vis_ =
-        node_->get_parameter("tool_radius_visualization").as_double();
-
-    this->lookup_area_ = node_->get_parameter("lookup_area").as_double();
-    this->plane_size_ = node_->get_parameter("plane_size").as_double();
+    mesh_type_ = node_->get_parameter("mesh_type").as_string();
+    input_mesh_path_ = node_->get_parameter("input_mesh_path").as_string();
+    output_mesh_path_ = node_->get_parameter("output_mesh_path").as_string();
+    skin_mesh_path_ = node_->get_parameter("skin_mesh_path").as_string();
+    tool_radius_ = node_->get_parameter("tool_radius").as_double();
+    tool_vis_radius_ =
+        node_->get_parameter("tool_visualization_radius").as_double();
+    lookup_area_ = node_->get_parameter("lookup_area").as_double();
+    plane_size_ = node_->get_parameter("plane_size").as_double();
 
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
     visualizer_ =
@@ -34,31 +32,18 @@ class VFEnforcer {
     if (mesh_type_ == "bunny") {
       open3d::data::BunnyMesh dataset;
       o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
-      o3d_mesh->Scale(2.0, Eigen::Vector3d(0, 0, 0));
-      o3d_mesh->Translate(Eigen::Vector3d(0.3, 0.0, 0.5));
+      o3d_mesh->Scale(3.0, Eigen::Vector3d(0, 0, 0));
+      o3d_mesh->Translate(Eigen::Vector3d(0.3, -0.2, 0.4));
     } else if (mesh_type_ == "knot") {
       open3d::data::KnotMesh dataset;
       o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
       o3d_mesh->Scale(0.002, Eigen::Vector3d(0, 0, 0));
-      o3d_mesh->Translate(Eigen::Vector3d(0.3, 0.0, 0.5));
+      o3d_mesh->Translate(Eigen::Vector3d(0.4, 0.0, 0.5));
     } else if (mesh_type_ == "sphere") {
       o3d_mesh = open3d::geometry::TriangleMesh::CreateSphere(0.2, 50);
-      o3d_mesh->Translate(Eigen::Vector3d(0.3, 0.0, 0.3));
-
+      o3d_mesh->Translate(Eigen::Vector3d(0.4, 0.0, 0.3));
     } else if (mesh_type_ == "file") {
       open3d::io::ReadTriangleMesh(input_mesh_path_, *o3d_mesh);
-      // compute normals
-      // open3d::geometry::KDTreeFlann kdtree;
-      // kdtree.SetGeometry(*o3d_mesh);
-      o3d_mesh->ComputeVertexNormals();
-      o3d_mesh->ComputeTriangleNormals();
-      for (size_t i = 0; i < o3d_mesh->triangles_.size(); i++) {
-        o3d_mesh->triangle_normals_[i] *= -1;
-        RCLCPP_INFO_STREAM(
-            node->get_logger(),
-            "Triangle normal: " << o3d_mesh->triangle_normals_[i].transpose());
-      }
-
       // open3d::visualization::DrawGeometries({o3d_mesh});
       // RCLCPP_INFO_STREAM(node->get_logger(), "Extruded mesh with " <<
       // o3d_mesh->vertices_.size() << " vertices and " <<
@@ -94,25 +79,25 @@ class VFEnforcer {
       //     o3d_mesh->triangle_normals_[i] *= -1;
       // }
     }
+    x_old_ << x_des[0], x_des[1], x_des[2];
+    delta_x_ << 0.0, 0.0, 0.0;
+    
     RCLCPP_INFO_STREAM(node->get_logger(), "Computing mesh properties...");
     mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_,
                                    o3d_mesh->triangle_normals_);
-    this->x_old_ = x_des;
-    this->x_des_old = x_des;
-    this->delta_x_ << 0.0, 0.0, 0.0;
-
     visualizer_->update_scene(constraint_planes_, x_des, x_old_,
-                              tool_radius_vis_);
+                              tool_vis_radius_);
+
   }
 
   Eigen::Vector3d enforce_vf(Eigen::Vector3d x_des) {
+    // RCLCPP_INFO_STREAM(node_->get_logger(), "");
     delta_x_ = compute_vf::enforce_virtual_fixture(
         *mesh_, x_des, x_old_, tool_radius_, constraint_planes_, lookup_area_,
         *visualizer_);
-
+    // integrate
     auto x_new = x_old_ + delta_x_;
     x_old_ = x_new;
-    x_des_old = x_des;
     geometry_msgs::msg::PoseStamped target_pose_vf;
     target_pose_vf.header.stamp = node_->now();
     target_pose_vf.header.frame_id = "base_link";
@@ -121,7 +106,7 @@ class VFEnforcer {
     target_pose_vf.pose.position.z = x_new[2];
     target_pose_vf.pose.orientation.w = 1.0;
     visualizer_->update_scene(constraint_planes_, x_des, x_new,
-                              tool_radius_vis_);
+                              tool_vis_radius_);
     return delta_x_;
   }
 
@@ -138,8 +123,8 @@ class VFEnforcer {
   double plane_size_;
   int client__id_;
   int ctr_;
-  double tool_radius_, tool_radius_vis_, lookup_area_;
-  Eigen::Vector3d x_old_, delta_x_, x_des_old;
+  double tool_radius_, tool_vis_radius_, lookup_area_;
+  Eigen::Vector3d x_old_, delta_x_;
 };
 
 #endif  // VF_ENFORCER_HPP

@@ -31,12 +31,7 @@ Eigen::Vector3d enforce_virtual_fixture(
   std::vector<int> T;
   mesh.find_nearby_triangles(current_position, max_distance, T);
 
-  std::cout << "Nearby triangles: " << T.size() << std::endl;
-  // if (T.size() == 0) {
-  // No nearby triangles found; return the target position
-  //   return target_position - current_position;
-  // }
-  // std::cout << "Nearby triangles: " << nearby_triangles.size() << std::endl;
+  // std::cout << "Nearby triangles: " << T.size() << std::endl;
 
   // Construct constraints based on nearby triangles
   constraint_planes.clear();
@@ -49,9 +44,7 @@ Eigen::Vector3d enforce_virtual_fixture(
     CP[Ti] = mesh.get_closest_on_triangle(current_position, Ti);
   }
   // vis.draw_closest_points(CP, 0.002);
-  // int iteration = 0;
   for (auto it = T.begin(); it != T.end();) {
-    // std::cout << "-----\nIteration: " << iteration++ << std::endl;
     int Ti = *it;
     auto Ni = mesh.normals[*it];
     Ni.normalize();
@@ -94,10 +87,15 @@ Eigen::Vector3d enforce_virtual_fixture(
           } else if (cpi_loc == Location::V3) {
             neighborIdxList1 = mesh.adjacency_dict.at({Ti, Location::V1V3});
             neighborIdxList2 = mesh.adjacency_dict.at({Ti, Location::V2V3});
+          } else {
+            std::cerr << "Invalid location: no adjacent triangles found"
+                      << std::endl;
+            exit(1);
           }
           bool keep = false;
-          int neighborIdx1, neighborIdx2;
-          // check if neighbor is already in the list
+          int neighborIdx1 = neighborIdxList1[0];
+          int neighborIdx2 = neighborIdxList2[0];
+          // check if neighbor is already in the list otherwise add it
           if (std::find(T.begin(), T.end(), neighborIdx1) == T.end()) {
             CP[neighborIdx1] =
                 mesh.get_closest_on_triangle(current_position, neighborIdx1);
@@ -109,33 +107,27 @@ Eigen::Vector3d enforce_virtual_fixture(
           auto [CPn1, cpn1_loc] = CP.at(neighborIdx1);
           auto [CPn2, cpn2_loc] = CP.at(neighborIdx2);
 
-          if (neighborIdxList1.size() > 0) {
-            neighborIdx1 = neighborIdxList1[0];
-            if (almost_equal(CPi, CPn1, eps)) {
-              for (auto j = it + 1; j != T.end();) {
-                if (*j == neighborIdx1) {
-                  T.erase(j);
-                  CP[neighborIdx1].second = Location::VOID;
-                  keep = true;
-                  break;
-                } else {
-                  j++;
-                }
+          if (almost_equal(CPi, CPn1, eps)) {
+            for (auto j = it + 1; j != T.end();) {
+              if (*j == neighborIdx1) {
+                T.erase(j);
+                CP[neighborIdx1].second = Location::VOID;
+                keep = true;
+                break;
+              } else {
+                j++;
               }
             }
           }
-          if (neighborIdxList2.size() > 0) {
-            neighborIdx2 = neighborIdxList2[0];
-            if (almost_equal(CPi, CPn2, eps)) {
-              for (auto j = it + 1; j != T.end();) {
-                if (*j == neighborIdx2) {
-                  T.erase(j);
-                  CP[neighborIdx2].second = Location::VOID;
-                  keep = true;
-                  break;
-                } else {
-                  j++;
-                }
+          if (almost_equal(CPi, CPn2, eps)) {
+            for (auto j = it + 1; j != T.end();) {
+              if (*j == neighborIdx2) {
+                T.erase(j);
+                CP[neighborIdx2].second = Location::VOID;
+                keep = true;
+                break;
+              } else {
+                j++;
               }
             }
           }
@@ -193,7 +185,6 @@ Eigen::Vector3d enforce_virtual_fixture(
     CP[*it].second = Location::VOID;
     T.erase(it);
   }
-  std::cout << "Loop end: " << T.size() << std::endl;
 
   const int n_constraints = constraint_planes.size();
   // std::cout << "Found " << n_constraints << " constraints" << std::endl;
@@ -209,7 +200,7 @@ Eigen::Vector3d enforce_virtual_fixture(
   auto direction = target_position - current_position;
   double step_size = std::min(direction.norm(), radius / 10);
   Eigen::Vector3d delta_x_des = direction.normalized() * step_size;
-  Eigen::Vector<real_t, 3> g = -2 * (delta_x_des);
+  Eigen::Vector<real_t, 3> g = -delta_x_des;
   // constraint matrix
   Eigen::Vector<real_t, Eigen::Dynamic> A_lb(n_constraints);  //,lb(3),ub(3);
 
@@ -247,7 +238,12 @@ Eigen::Vector3d enforce_virtual_fixture(
     std::cerr << "QP problem not initialized" << std::endl;
     return Eigen::Vector3d::Zero();
   }
-  min_problem.getPrimalSolution(delta_x.data());
+  auto success = min_problem.getPrimalSolution(delta_x.data());
+  if (success != qpOASES::SUCCESSFUL_RETURN) {
+    std::cerr << "QP problem not solved" << std::endl;
+    return Eigen::Vector3d::Zero();
+  }
+  // // std::cout << "delta_x: " << delta_x << std::endl;
 
   return delta_x.cast<double>();
 }

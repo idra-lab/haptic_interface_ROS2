@@ -171,8 +171,9 @@ void HapticControlBase::init_vf_enforcer() {
                             target_pose_.pose.position.y,
                             target_pose_.pose.position.z);
   vf_enforcer_ = std::make_shared<VFEnforcer>(this->shared_from_this(),
-                                              x_desired,
-                                              this->base_link_name_);
+                                              x_desired, this->base_link_name_);
+  RCLCPP_INFO(this->get_logger(),
+              "\033[0;32mVirtual fixture enforcer initialized\033[0m");
 }
 
 void HapticControlBase::enable_safety_sphere_CB(const rclcpp::Parameter &p) {
@@ -279,7 +280,6 @@ void HapticControlBase::initialize_haptic_control() {
                           "Waiting for the haptic device to start publishing");
     rclcpp::spin_some(haptic_device_);
   }
-  haptic_device_->start_force_feedback();
   x_new_ << haptic_device_->haptic_starting_pose_.pose.position.x,
       haptic_device_->haptic_starting_pose_.pose.position.y,
       haptic_device_->haptic_starting_pose_.pose.position.z;
@@ -303,6 +303,9 @@ void HapticControlBase::initialize_haptic_control() {
       std::chrono::duration<double>(1.0 / haptic_control_rate_),
       std::bind(&HapticControlBase::control_thread, this));
   RCLCPP_INFO(this->get_logger(), "\033[0;32mControl thread started\033[0m");
+  // Start the force feedback
+  haptic_device_->start_force_feedback();
+  RCLCPP_INFO(this->get_logger(), "\033[0;32mForce feedback started\033[0m");
 }
 
 Eigen::Vector3d HapticControlBase::compute_position_error() {
@@ -343,14 +346,16 @@ void HapticControlBase::control_thread() {
     return;
   }
   // Robot data consistency check, compare the time from the last ee pose update
-  // if ((this->get_clock()->now() - last_robot_pose_update_time_).seconds() >
-  //     15.0) {
-  //   RCLCPP_ERROR(this->get_logger(),
-  //                "Robot pose not updated in the 5 last seconds, shutting
-  //                down");
-  //   // shutdown the node
-  //   rclcpp::shutdown();
-  // }
+  if (!first_control_loop_ &&
+      (this->get_clock()->now() - last_robot_pose_update_time_).seconds() >
+          2.0) {
+    RCLCPP_ERROR(
+        this->get_logger(),
+        "Robot pose not updated within the last 2 seconds, shutting down");
+    // shutdown the node
+    rclcpp::shutdown();
+  }
+  first_control_loop_ = false;
 
   // Update the haptic device pose
   if (enable_safety_sphere_) {
