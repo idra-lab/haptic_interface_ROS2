@@ -18,6 +18,7 @@ Sample example of teleoperation using haptic device and force feedback
 #include <memory>
 #include <rclcpp/parameter_event_handler.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include "conic_cbf/conic_cbf.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/wrench_stamped.hpp"
 #include "mesh_virtual_fixtures/vf_enforcer.hpp"
@@ -35,81 +36,11 @@ using namespace Eigen;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using namespace std::chrono_literals;
-// Map for movement keys
-std::map<char, std::vector<float>> moveBindings{
-    {'w', {1, 0, 0}},  {'s', {-1, 0, 0}}, {'a', {0, 1, 0}},
-    {'d', {0, -1, 0}}, {'q', {0, 0, 1}},  {'e', {0, 0, -1}}};
-
-// Reminder message
-const char *msg = R"(
-Reading from the keyboard!
----------------------------
-Moving around:
-   q    w    e
-   a    s    d
-
-Press Ctrl-C to quit.
-)";
-
-// Init variables
-char key(' ');
-const double motion_scale = 0.01;
-// For non-blocking keyboard inputs
-int getch(void) {
-  int ch = -1;  // Default to -1 if no input is available
-  struct termios oldt, newt;
-  int oldf;
-
-  // Store old terminal settings and copy to new settings
-  tcgetattr(STDIN_FILENO, &oldt);
-  newt = oldt;
-
-  // Set terminal to raw mode
-  newt.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-
-  // Set stdin to non-blocking mode
-  oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
-  fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
-
-  // Attempt to read a character
-  ch = getchar();
-
-  // Restore old terminal settings
-  tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-  fcntl(STDIN_FILENO, F_SETFL, oldf);  // Restore old file status flags
-
-  return ch;  // Will return -1 if no input was available
-}
-
-// Function to check speed is in the range or not
-// Used to linearly increase/decrease the speed
-float vel_check(float curr, bool decrease = false) {
-  if (decrease)
-    curr = (curr >= -0.95) ? curr - 0.05 : -1;
-  else
-    curr = (curr <= 0.95) ? curr + 0.05 : 1;
-  return curr;
-}
-
-// Linear vel for arrow keys
-float Lvel(char key, float x) {
-  if (key == 'A') return vel_check(x, false);
-  if (key == 'B') return vel_check(x, true);
-  return 0;
-}
-// Angular vel for arrow keys
-float Avel(char key, float th) {
-  if (key == 'C') return vel_check(th, true);
-  if (key == 'D') return vel_check(th, false);
-  return 0;
-}
 
 class KeyboardControl : public rclcpp::Node {
  public:
   KeyboardControl(
-      const std::string &name = "haptic_control",
-      const std::string &namespace_ = "",
+      const std::string &name = "keyboard_control",
       const rclcpp::NodeOptions &options =
           rclcpp::NodeOptions()
               .allow_undeclared_parameters(true)
@@ -118,10 +49,60 @@ class KeyboardControl : public rclcpp::Node {
                              double safety_sphere_radius_);
   void readInput();
   void init_vf_enforcer();
-  void startLoop();
+  void init_control();
   void controlThread();
 
  private:
+  // Map for movement keys
+  // std::map<char, std::vector<float>> moveBindings{
+  //     {'w', {1, 0, 0}},  {'s', {-1, 0, 0}}, {'a', {0, 1, 0}},
+  //     {'d', {0, -1, 0}}, {'q', {0, 0, 1}},  {'e', {0, 0, -1}}
+  //     {''
+  //   };
+
+  // Reminder message
+  const char *msg = R"(
+Reading from the keyboard!
+---------------------------
+Moving around:
+ q    w    e
+ a    s    d
+
+Press Ctrl-C to quit.
+)";
+
+  // Init variables
+  char key = ' ';
+  const double motion_scale_l = 0.01;
+  const double motion_scale_a = 0.01;
+  // For non-blocking keyboard inputs
+  int getch(void) {
+    int ch = -1;  // Default to -1 if no input is available
+    struct termios oldt, newt;
+    int oldf;
+
+    // Store old terminal settings and copy to new settings
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+
+    // Set terminal to raw mode
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    // Set stdin to non-blocking mode
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+    // Attempt to read a character
+    ch = getchar();
+
+    // Restore old terminal settings
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);  // Restore old file status flags
+
+    return ch;  // Will return -1 if no input was available
+  }
+
   // ROS2 subscribtions
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
       target_pos_publisher_;
@@ -146,15 +127,18 @@ class KeyboardControl : public rclcpp::Node {
   std::string base_link_name_;
 
   bool received_ee_pose_;
-
+  bool use_vf_ = false;
+  Eigen::Vector3d euler_angles_;
+  Eigen::Quaterniond q_new, q_old, q_init;
+  Eigen::Vector3d thetas;
   std::array<double, 7> cur_pose_;
   std::array<double, 3> bounding_box_center_;
   std::shared_ptr<VFEnforcer> vf_enforcer_;
 
-  // current and old hapitc positions
-  Eigen::Vector3d x_new_, x_old_;
+  // current haptic positions
+  Eigen::Vector3d x_new_;
   // current and old haptic displacements
-  Eigen::Vector3d x_tilde_old_, x_tilde_new_;
+  Eigen::Vector3d x_tilde_new_;
 };
 
 #endif  // KEYBOARD_TELEOPERATION_HPP

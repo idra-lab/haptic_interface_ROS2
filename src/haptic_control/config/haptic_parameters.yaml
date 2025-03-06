@@ -41,3 +41,16 @@ haptic_control:
     
     lookup_area: 0.005 # area around the end effector to look for the closest point on the mesh
     plane_size: 0.002 # plane size used to visualize active constraints in rviz
+
+keyboard_control:
+  ros__parameters:
+    # vf parameters:
+    mesh_type: "bunny" # knot, sphere, file, bunny 
+    output_mesh_path : "/home/nardi/virtual_fixture_vis.obj" # path to save the output mesh for Rviz visualization
+    input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj" # path to the input mesh if mesh_type is file
+    skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj" # path to the skin mesh if mesh_type is file
+    tool_radius: 0.002 # radius of the end effector sphere
+    tool_visualization_radius: 0.005 # radius of the end effector sphere for visualization in Rviz
+    
+    lookup_area: 0.005 # area around the end effector to look for the closest point on the mesh
+    plane_size: 0.002 # plane size used to visualize active constraints in rviz
