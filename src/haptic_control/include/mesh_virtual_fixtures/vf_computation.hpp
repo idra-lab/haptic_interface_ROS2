@@ -31,9 +31,9 @@ Eigen::Vector3d enforce_virtual_fixture(
   std::vector<int> T;
   mesh.find_nearby_triangles(current_position, max_distance, T);
 
-  // std::cout << "Nearby triangles: " << T.size() << std::endl;
+  std::cout << "Nearby triangles: " << T.size() << std::endl;
   // if (T.size() == 0) {
-    // No nearby triangles found; return the target position
+  // No nearby triangles found; return the target position
   //   return target_position - current_position;
   // }
   // std::cout << "Nearby triangles: " << nearby_triangles.size() << std::endl;
@@ -193,6 +193,7 @@ Eigen::Vector3d enforce_virtual_fixture(
     CP[*it].second = Location::VOID;
     T.erase(it);
   }
+  std::cout << "Loop end: " << T.size() << std::endl;
 
   const int n_constraints = constraint_planes.size();
   // std::cout << "Found " << n_constraints << " constraints" << std::endl;
@@ -226,8 +227,8 @@ Eigen::Vector3d enforce_virtual_fixture(
   }
 
   // Assuming x is of dimension 3
-  const float max_delta = 0.00001;
-  real_t x_lb[3] = {-max_delta, -max_delta, -max_delta};  // lower bound  
+  const float max_delta = 0.0001;
+  real_t x_lb[3] = {-max_delta, -max_delta, -max_delta};  // lower bound
   real_t x_ub[3] = {max_delta, max_delta, max_delta};     // upper bound
   qpOASES::Options myOptions;
   myOptions.printLevel = qpOASES::PL_LOW;
@@ -235,14 +236,18 @@ Eigen::Vector3d enforce_virtual_fixture(
   min_problem.setOptions(myOptions);
   Eigen::Vector<real_t, 3> delta_x;
   int nWSR = 200;
-  if(n_constraints != 0){
-    min_problem.init(H.data(), g.data(), A.data(), x_lb, x_ub, A_lb.data(), 0, nWSR);
-  }else{
+  if (n_constraints != 0) {
+    min_problem.init(H.data(), g.data(), A.data(), x_lb, x_ub, A_lb.data(), 0,
+                     nWSR);
+  } else {
     min_problem.init(H.data(), g.data(), 0, x_lb, x_ub, 0, 0, nWSR);
   }
-  // min_problem.init(H.data(), g.data(), A.data(), 0, 0, A_lb.data(), 0, nWSR);
+  // catch no solution
+  if (min_problem.isInitialised() == false) {
+    std::cerr << "QP problem not initialized" << std::endl;
+    return Eigen::Vector3d::Zero();
+  }
   min_problem.getPrimalSolution(delta_x.data());
-  // // std::cout << "delta_x: " << delta_x << std::endl;
 
   return delta_x.cast<double>();
 }

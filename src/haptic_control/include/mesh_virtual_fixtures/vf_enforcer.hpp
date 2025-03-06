@@ -34,6 +34,7 @@ class VFEnforcer {
     if (mesh_type_ == "bunny") {
       open3d::data::BunnyMesh dataset;
       o3d_mesh = open3d::io::CreateMeshFromFile(dataset.GetPath());
+      o3d_mesh->Scale(2.0, Eigen::Vector3d(0, 0, 0));
       o3d_mesh->Translate(Eigen::Vector3d(0.3, 0.0, 0.5));
     } else if (mesh_type_ == "knot") {
       open3d::data::KnotMesh dataset;
