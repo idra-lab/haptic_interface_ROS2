@@ -21,14 +21,14 @@ https://ieeexplore.ieee.org/document/9341590/
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/wrench_stamped.hpp"
 
+#include "conic_cbf/conic_cbf.hpp"
+#include "mesh_virtual_fixtures/vf_enforcer.hpp"
+#include "system_interface.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/transform_broadcaster.h"
-
-#include "circular_buffer.hpp"
-#include "mesh_virtual_fixtures/vf_enforcer.hpp"
-#include "conic_cbf/conic_cbf.hpp"
-#include "system_interface.hpp"
+#include "utils/circular_buffer.hpp"
+#include "utils/conversions.hpp"
 
 class HapticControlBase : public rclcpp::Node {
  public:
@@ -58,10 +58,11 @@ class HapticControlBase : public rclcpp::Node {
   void project_target_on_sphere(Eigen::Vector3d &target_position_vec,
                                 double safety_sphere_radius_);
   geometry_msgs::msg::TransformStamped target_pose_tf_;
-  geometry_msgs::msg::PoseStamped target_pose_, target_pose_vf_, current_pose_,
-      old_target_pose_vf_;
+  geometry_msgs::msg::PoseStamped target_pose_, target_pose_vf_, current_pose_;
   std::string base_link_name_;
   bool use_fixtures_ = true;
+  bool use_ccbf_ = true;
+  bool use_initial_conf_as_q_ref_ = false;
   std::shared_ptr<SystemInterface> haptic_device_;
 
  private:
@@ -94,7 +95,7 @@ class HapticControlBase : public rclcpp::Node {
   geometry_msgs::msg::PoseStamped ee_starting_position;
   geometry_msgs::msg::PoseStamped ee_current_pose_;
   geometry_msgs::msg::PoseStamped haptic_starting_pose_;
-  Eigen::Quaterniond q_haptic_base_to_robot_base_, qEEStart;
+  Eigen::Quaterniond q_haptic_base_to_robot_base_, qEEStart_;
   double safety_sphere_radius_, safety_box_width_, safety_box_length_,
       safety_box_height_;
   double max_force_;
@@ -125,7 +126,8 @@ class HapticControlBase : public rclcpp::Node {
   uint32_t status_state_;
   uint32_t status_button_;
   // current and old hapitc positions
-  Eigen::Vector3d x_new_, x_old_;
+  Eigen::Vector3d x_new_, x_old_, thetas_;
+  Eigen::Quaterniond q_new_, q_old_, q_ref_;
   // current and old haptic displacements
   Eigen::Vector3d x_tilde_old_, x_tilde_new_;
 

@@ -8,6 +8,7 @@ haptic_control:
     base_frame_rotation: [0.0, 0.0, 1.0, 0.0] # quaternion in the form [x, y, z, w], it is used to align the robot base link with the haptic interface base link
     ft_feedback_topic_name: "/lbr/force_torque_broadcaster/wrench"
 
+
 keyboard_control:
   ros__parameters:
     tool_link_name: "probe"

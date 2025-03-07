@@ -15,15 +15,15 @@ class VFEnforcer {
 
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
                 "Starting VF Control node with name vf_control");
-    mesh_type_ = node_->get_parameter("mesh_type").as_string();
-    input_mesh_path_ = node_->get_parameter("input_mesh_path").as_string();
-    output_mesh_path_ = node_->get_parameter("output_mesh_path").as_string();
-    skin_mesh_path_ = node_->get_parameter("skin_mesh_path").as_string();
-    tool_radius_ = node_->get_parameter("tool_radius").as_double();
+    mesh_type_ = node_->get_parameter("vf_parameters.mesh_type").as_string();
+    input_mesh_path_ = node_->get_parameter("vf_parameters.input_mesh_path").as_string();
+    output_mesh_path_ = node_->get_parameter("vf_parameters.output_mesh_path").as_string();
+    skin_mesh_path_ = node_->get_parameter("vf_parameters.skin_mesh_path").as_string();
+    tool_radius_ = node_->get_parameter("vf_parameters.tool_radius").as_double();
     tool_vis_radius_ =
-        node_->get_parameter("tool_visualization_radius").as_double();
-    lookup_area_ = node_->get_parameter("lookup_area").as_double();
-    plane_size_ = node_->get_parameter("plane_size").as_double();
+        node_->get_parameter("vf_parameters.tool_visualization_radius").as_double();
+    lookup_area_ = node_->get_parameter("vf_parameters.lookup_area").as_double();
+    plane_size_ = node_->get_parameter("vf_parameters.plane_size").as_double();
 
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
     visualizer_ =
@@ -64,7 +64,7 @@ class VFEnforcer {
                            << o3d_mesh->triangles_.size() << " triangles.");
     // Ensure the mesh has vertices
     if (o3d_mesh->vertices_.empty()) {
-      std::cerr << "The loaded mesh contains no vertices." << std::endl;
+      RCLCPP_ERROR_STREAM(node->get_logger(), "Mesh has no vertices, shutting down");
       rclcpp::shutdown();
     }
     o3d_mesh->RemoveDuplicatedVertices();
@@ -107,7 +107,7 @@ class VFEnforcer {
     target_pose_vf.pose.orientation.w = 1.0;
     visualizer_->update_scene(constraint_planes_, x_des, x_new,
                               tool_vis_radius_);
-    return delta_x_;
+    return x_new;
   }
 
   // private:

@@ -6,15 +6,16 @@ haptic_control:
     local_ip_address: "192.168.100.50"
     haptic_control_rate: 1000.0
     max_force: 6.0 # Newton
+    simulated_delay: 0.0 # round trip simulated delay in seconds (0.0 for no delay)
 
     enable_safety_sphere: false
     safety_sphere_radius: 0.48
-    min_x:  -100.0
-    max_x:  100.0
-    min_y:  -100.0
-    max_y:  100.0
-    min_z:  -100.0
-    max_z:  100.0
+    min_x: -100.0
+    max_x: 100.0
+    min_y: -100.0
+    max_y: 100.0
+    min_z: -100.0
+    max_z: 100.0
     # min_x_:  0.33
     # max_x_:  0.48
     # min_y_: -0.03
@@ -22,35 +23,41 @@ haptic_control:
     # min_z_:  -0.10
     # max_z_:  0.13
 
-
-    delay: 0.0 # round trip simulated delay in seconds (0.0 for no delay)
-    force_scale : 0.3
+    force_scale: 0.3
     # safety box that can be activated (centered in the current ee position) -> Not implemented yet
-    enable_safety_box: false 
+    enable_safety_box: false
     safety_box_length: 0.2
     safety_box_width: 0.2
     safety_box_height: 0.2
 
-    # vf parameters:
-    mesh_type: "file" # knot, sphere, file, bunny 
-    output_mesh_path : "/home/nardi/virtual_fixture_vis.obj" # path to save the output mesh for Rviz visualization
-    input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj" # path to the input mesh if mesh_type is file
-    skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj" # path to the skin mesh if mesh_type is file
-    tool_radius: 0.002 # radius of the end effector sphere
-    tool_visualization_radius: 0.005 # radius of the end effector sphere for visualization in Rviz
-    
-    lookup_area: 0.005 # area around the end effector to look for the closest point on the mesh
-    plane_size: 0.002 # plane size used to visualize active constraints in rviz
+    # virtual fixture parameters to constrain the end effector over a mesh
+    vf_parameters:
+      mesh_type: "file" # knot, sphere, file, bunny
+      output_mesh_path: "/home/nardi/virtual_fixture_vis.obj" # path to save the output mesh for Rviz visualization
+      input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj" # path to the input mesh if mesh_type is file
+      skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj" # path to the skin mesh if mesh_type is file
+      tool_radius: 0.002 # radius of the end effector sphere
+      tool_visualization_radius: 0.005 # radius of the end effector sphere for visualization in Rviz
+
+      lookup_area: 0.005 # area around the end effector to look for the closest point on the mesh
+      plane_size: 0.002 # plane size used to visualize active constraints in rviz
+
+    # conic control barrier function parameters to constraint the robot orientation inside a cone
+    use_ccbf: true
+    ccbf_params:
+      use_initial_conf_as_q_ref: true # if true, the initial end effector orientation is used as the reference orientation
+      ccbf_q_ref: [0.63, 0.56, 0.40, 0.35] # quaternion in the form [x, y, z, w] for the reference orientation of the end effector, considered only if use_initial_conf_as_q_ref is false
+      ccbf_thetas: [0.4, 0.4, 0.4] # angle in radians for each axis of R_ref (which is q_ref as a rotation matrix)
 
 keyboard_control:
   ros__parameters:
-    # vf parameters:
-    mesh_type: "bunny" # knot, sphere, file, bunny 
-    output_mesh_path : "/home/nardi/virtual_fixture_vis.obj" # path to save the output mesh for Rviz visualization
-    input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj" # path to the input mesh if mesh_type is file
-    skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj" # path to the skin mesh if mesh_type is file
-    tool_radius: 0.002 # radius of the end effector sphere
-    tool_visualization_radius: 0.005 # radius of the end effector sphere for visualization in Rviz
-    
-    lookup_area: 0.005 # area around the end effector to look for the closest point on the mesh
-    plane_size: 0.002 # plane size used to visualize active constraints in rviz
+    vf_parameters:
+      mesh_type: "bunny" # knot, sphere, file, bunny
+      output_mesh_path: "/home/nardi/virtual_fixture_vis.obj" # path to save the output mesh for Rviz visualization
+      input_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/final_vf.obj" # path to the input mesh if mesh_type is file
+      skin_mesh_path: "/home/nardi/SKEL_WS/ros2_ws/skin_mesh.obj" # path to the skin mesh if mesh_type is file
+      tool_radius: 0.002 # radius of the end effector sphere
+      tool_visualization_radius: 0.005 # radius of the end effector sphere for visualization in Rviz
+
+      lookup_area: 0.005 # area around the end effector to look for the closest point on the mesh
+      plane_size: 0.002 # plane size used to visualize active constraints in rviz

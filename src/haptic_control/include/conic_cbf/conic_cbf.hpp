@@ -46,6 +46,15 @@ inline Eigen::Vector3d L_gh(Eigen::Matrix3d &R, Eigen::Vector3d &e_w,
   return -e_ref.transpose() * R * skew(e_w);
 }
 
+bool is_inside_cone(const Eigen::Quaterniond &q, const Eigen::Quaterniond &q_ref,
+                    const Eigen::Vector3d &thetas) {
+  Eigen::Matrix3d R = q.toRotationMatrix();
+  Eigen::Matrix3d R_ref = q_ref.toRotationMatrix();
+  Eigen::Vector3d e_w = Eigen::Vector3d::Unit(2);
+  Eigen::Vector3d e_ref = R_ref.col(2);
+  return h(R, e_w, e_ref, thetas(2)) >= 0;
+}
+
 Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
                                    Eigen::Quaterniond &q,
                                    const Eigen::Quaterniond &q_new,

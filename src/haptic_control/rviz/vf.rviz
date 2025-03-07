@@ -161,7 +161,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /lbr/target_framee
+        Value: /lbr/target_frame
       Value: true
     - Alpha: 1
       Axes Length: 0.10000000149011612
@@ -229,16 +229,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 0.820622980594635
+      Distance: 1.0568222999572754
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.6369832158088684
-        Y: -0.06276121735572815
-        Z: 0.5573422312736511
+        X: 0.5659635066986084
+        Y: -0.06912752985954285
+        Z: 0.4723541736602783
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
