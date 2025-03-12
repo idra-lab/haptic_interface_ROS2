@@ -88,9 +88,10 @@ Eigen::Vector3d enforce_virtual_fixture(
             neighborIdxList1 = mesh.adjacency_dict.at({Ti, Location::V1V3});
             neighborIdxList2 = mesh.adjacency_dict.at({Ti, Location::V2V3});
           } else {
-            std::cerr << "Invalid location: no adjacent triangles found"
+            std::cout << "Invalid location: no adjacent triangles found"
                       << std::endl;
-            exit(1);
+            // exit(1);
+            continue;
           }
           bool keep = false;
           int neighborIdx1 = neighborIdxList1[0];

@@ -307,6 +307,9 @@ void HapticControlBase::initialize_haptic_control() {
   if (use_ccbf_) {
     if (use_initial_conf_as_q_ref_) {
       q_ref_ = qEEStart_;
+      RCLCPP_WARN(this->get_logger(),
+                  "Initial configuration quaternion: x: %f | y: %f | z: %f | w: %f",
+                  q_ref_.x(), q_ref_.y(), q_ref_.z(), q_ref_.w());
     }
     Eigen::Vector3d euler_angles =
         qEEStart_.toRotationMatrix().eulerAngles(0, 1, 2);
@@ -418,15 +421,20 @@ void HapticControlBase::control_thread() {
       base_link_name_;
   target_pose_tf_.child_frame_id = "haptic_interface_target";
 
+  
   // Apply delta position
   target_pose_.pose.position.x =
-      ee_starting_position.pose.position.x + position_error.x();
+  ee_starting_position.pose.position.x + position_error.x();
   target_pose_.pose.position.y =
-      ee_starting_position.pose.position.y + position_error.y();
+  ee_starting_position.pose.position.y + position_error.y();
   target_pose_.pose.position.z =
-      ee_starting_position.pose.position.z + position_error.z();
+  ee_starting_position.pose.position.z + position_error.z();
   target_pose_tf_.transform.translation =
-      point_to_vector3(target_pose_.pose.position);
+  point_to_vector3(target_pose_.pose.position);
+  
+  // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+  //                      "Target_position: %f %f %f", target_pose_.pose.position.x,
+  //                       target_pose_.pose.position.y, target_pose_.pose.position.z);
 
   // Apply delta rotation
   Eigen::Quaterniond target_orientation = orientation_error * qEEStart_;
@@ -475,6 +483,9 @@ void HapticControlBase::control_thread() {
 
     auto q_opt =
         conic_cbf::cbfOrientFilter(q_ref_, q_old_, q_new_, thetas_, 0.001);
+    // RCLCPP_INFO(this->get_logger(), "q_old: %f %f %f %f, q_opt: %f %f %f %f",
+    //             q_old_.x(), q_old_.y(), q_old_.z(), q_old_.w(), q_opt.x(),
+    //             q_opt.y(), q_opt.z(), q_opt.w());
     q_old_ = q_opt;
     target_pose_vf_.pose.orientation = eigenToRosQuat(q_opt);
   }

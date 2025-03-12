@@ -71,8 +71,8 @@ Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
   qpOASES::QProblem min_problem(3, n_constraints,
                                 qpOASES::HessianType::HST_IDENTITY);
   min_problem.setOptions(qpOptions);
-  std::cout << "R\n: " << R << std::endl;
-  std::cout << "R new\n: " << R_new << std::endl;
+  // std::cout << "R\n: " << R << std::endl;
+  // std::cout << "R new\n: " << R_new << std::endl;
   Eigen::Matrix3d delta_R = R.transpose() * R_new;
   Eigen::Vector3d omega = log_map(delta_R);
   Eigen::Vector3d u_nominal = omega;
@@ -110,7 +110,10 @@ Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
   //           << h(R, Eigen::Vector3d::Unit(2), R_ref.col(2), thetas(2))
   //           << std::endl;
   Eigen::Vector3d omega_opt(u(0), u(1), u(2));
-  std::cout << "Omega abs error: " << (omega - omega_opt).norm() << std::endl;
+  // std::cout << "Omega abs error: " << (omega - omega_opt).norm() << std::endl;
+
+  // filter to max ang vel
+  omega_opt = std::min(omega_opt.norm(), 0.3) * omega_opt.normalized();
 
   Eigen::Vector3d angle = omega_opt * dt;
   Eigen::Matrix3d R_opt = R * exp_map(angle);
