@@ -44,7 +44,9 @@ Eigen::Vector3d enforce_virtual_fixture(
     CP[Ti] = mesh.get_closest_on_triangle(current_position, Ti);
   }
   // vis.draw_closest_points(CP, 0.002);
+  // int iter = 0;
   for (auto it = T.begin(); it != T.end();) {
+    // std::cout << iter++ << std::endl;
     int Ti = *it;
     auto Ni = mesh.normals[*it];
     Ni.normalize();
@@ -88,12 +90,14 @@ Eigen::Vector3d enforce_virtual_fixture(
             neighborIdxList1 = mesh.adjacency_dict.at({Ti, Location::V1V3});
             neighborIdxList2 = mesh.adjacency_dict.at({Ti, Location::V2V3});
           } else {
-            std::cout << "Invalid location: no adjacent triangles found"
-                      << std::endl;
-            // exit(1);
+            it++;
             continue;
           }
           bool keep = false;
+          if (neighborIdxList1.size() == 0 || neighborIdxList2.size() == 0) {
+            it++;
+            continue;
+          }
           int neighborIdx1 = neighborIdxList1[0];
           int neighborIdx2 = neighborIdxList2[0];
           // check if neighbor is already in the list otherwise add it
@@ -244,7 +248,7 @@ Eigen::Vector3d enforce_virtual_fixture(
     std::cerr << "QP problem not solved" << std::endl;
     return Eigen::Vector3d::Zero();
   }
-  // // std::cout << "delta_x: " << delta_x << std::endl;
+  // std::cout << "delta_x: " << delta_x << std::endl;
 
   return delta_x.cast<double>();
 }
