@@ -261,11 +261,11 @@ void HapticControlBase::get_ee_trans(
     trans = tf_buffer_->lookupTransform(base_link_name_, tool_link_name_,
                                         tf2::TimePointZero);
     received_ee_pose_ = true;
+    last_robot_pose_update_time_ = trans.header.stamp;
   } catch (tf2::TransformException &ex) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                           "End Effector pose not available: %s", ex.what());
   }
-  last_robot_pose_update_time_ = trans.header.stamp;
 }
 
 void HapticControlBase::initialize_haptic_control() {
@@ -273,7 +273,7 @@ void HapticControlBase::initialize_haptic_control() {
   geometry_msgs::msg::TransformStamped trans;
 
   // Wait until end-effector pose is received
-  while (!received_ee_pose_) {
+  while (!received_ee_pose_ && rclcpp::ok()) {
     get_ee_trans(trans);
   }
 
@@ -406,6 +406,10 @@ void HapticControlBase::control_thread() {
         "Robot pose not updated within the last 2 seconds, shutting down");
     rclcpp::shutdown();
   }
+  // else{
+  //   RCLCPP_INFO(this->get_logger(), "Robot pose updated after %f seconds",
+  //               (this->get_clock()->now() - last_robot_pose_update_time_).seconds());
+  // }
   first_control_loop_ = false;
 
   // Update haptic device pose with safety sphere check

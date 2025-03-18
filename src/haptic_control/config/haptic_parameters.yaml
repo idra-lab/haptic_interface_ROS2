@@ -39,15 +39,15 @@ haptic_control:
       tool_radius: 0.002 # radius of the end effector sphere
       tool_visualization_radius: 0.005 # radius of the end effector sphere for visualization in Rviz
 
-      lookup_area: 0.005 # area around the end effector to look for the closest point on the mesh
+      lookup_area: 0.004 # area around the end effector to look for the closest point on the mesh
       plane_size: 0.002 # plane size used to visualize active constraints in rviz
 
     # conic control barrier function parameters to constraint the robot orientation inside a cone
-    use_ccbf: false
-    ccbf_params:
-      use_initial_conf_as_q_ref: true # if true, the initial end effector orientation is used as the reference orientation
-      ccbf_q_ref: [0.63, 0.56, 0.40, 0.35] # quaternion in the form [x, y, z, w] for the reference orientation of the end effector, considered only if use_initial_conf_as_q_ref is false
-      ccbf_thetas: [0.4, 0.4, 0.4] # angle in radians for each axis of R_ref (which is q_ref as a rotation matrix)
+      use_ccbf: true
+      ccbf_params:
+        use_initial_conf_as_q_ref: true # if true, the initial end effector orientation is used as the reference orientation
+        ccbf_q_ref: [0.63, 0.56, 0.40, 0.35] # quaternion in the form [x, y, z, w] for the reference orientation of the end effector, considered only if use_initial_conf_as_q_ref is false
+        ccbf_thetas: [0.35, 0.35, 0.35] # angle in radians for each axis of R_ref (which is q_ref as a rotation matrix)
 
 keyboard_control:
   ros__parameters:
