@@ -29,39 +29,41 @@ HapticControlBase::HapticControlBase(const std::string &name,
   }
   // use conic barrier function to constraint the robot orientation within a
   // cone
-  use_ccbf_ = this->get_parameter("use_ccbf").as_bool();
-  if (use_ccbf_) {
+  use_ccbf_ = this->get_parameter("vf_parameters.use_ccbf").as_bool();
+  if (use_fixtures_ && use_ccbf_) {
     std::vector<double> thetas_list(3), q_ref_list(4);
-    thetas_list =
-        this->get_parameter("ccbf_params.ccbf_thetas").as_double_array();
+    thetas_list = this->get_parameter("vf_parameters.ccbf_params.ccbf_thetas")
+                      .as_double_array();
     thetas_ = Eigen::Vector3d(thetas_list[0], thetas_list[1], thetas_list[2]);
 
     RCLCPP_WARN(this->get_logger(),
                 "Using Conic Barrier Function: \nthetas: %f %f %f", thetas_(0),
                 thetas_(1), thetas_(2));
     use_initial_conf_as_q_ref_ =
-        this->get_parameter("ccbf_params.use_initial_conf_as_q_ref").as_bool();
+        this->get_parameter(
+                "vf_parameters.ccbf_params.use_initial_conf_as_q_ref")
+            .as_bool();
     if (!use_initial_conf_as_q_ref_) {
-      q_ref_list =
-          this->get_parameter("ccbf_params.ccbf_q_ref").as_double_array();
+      q_ref_list = this->get_parameter("vf_parameters.ccbf_params.ccbf_q_ref")
+                       .as_double_array();
       q_ref_ = Eigen::Quaterniond(q_ref_list[3], q_ref_list[0], q_ref_list[1],
                                   q_ref_list[2])
                    .normalized();
-      RCLCPP_WARN(this->get_logger(),
-                  "Provided reference configuration: x: %f | y: %f | z: %f | w: %f",
-                  q_ref_.x(), q_ref_.y(), q_ref_.z(), q_ref_.w());
+      RCLCPP_WARN(
+          this->get_logger(),
+          "Provided reference configuration: x: %f | y: %f | z: %f | w: %f",
+          q_ref_.x(), q_ref_.y(), q_ref_.z(), q_ref_.w());
     } else {
       RCLCPP_WARN(this->get_logger(),
                   "Using initial configuration as reference orientation");
     }
   }
-  if (this->enable_safety_sphere_) {
-    this->safety_sphere_radius_ =
+  if (enable_safety_sphere_) {
+    safety_sphere_radius_ =
         this->get_parameter("safety_sphere_radius").as_double();
-    this->safety_sphere_radius_ =
-        std::clamp(this->safety_sphere_radius_, 0.0, 2.0);
+    safety_sphere_radius_ = std::clamp(safety_sphere_radius_, 0.0, 2.0);
   } else {
-    this->safety_sphere_radius_ = std::numeric_limits<double>::infinity();
+    safety_sphere_radius_ = std::numeric_limits<double>::infinity();
   }
   // safety box dimension
   this->enable_safety_box_ = this->get_parameter("enable_safety_box").as_bool();
@@ -304,12 +306,13 @@ void HapticControlBase::initialize_haptic_control() {
   qEEStart_ = rosQuatToEigen(ee_starting_position.pose.orientation);
 
   // get euler to check if the current orientation is inside cbf cones
-  if (use_ccbf_) {
+  if (use_fixtures_ && use_ccbf_) {
     if (use_initial_conf_as_q_ref_) {
       q_ref_ = qEEStart_;
-      RCLCPP_WARN(this->get_logger(),
-                  "Initial configuration quaternion: x: %f | y: %f | z: %f | w: %f",
-                  q_ref_.x(), q_ref_.y(), q_ref_.z(), q_ref_.w());
+      RCLCPP_WARN(
+          this->get_logger(),
+          "Initial configuration quaternion: x: %f | y: %f | z: %f | w: %f",
+          q_ref_.x(), q_ref_.y(), q_ref_.z(), q_ref_.w());
     }
     Eigen::Vector3d euler_angles =
         qEEStart_.toRotationMatrix().eulerAngles(0, 1, 2);
@@ -322,7 +325,8 @@ void HapticControlBase::initialize_haptic_control() {
   }
   // Start haptic device connection
   haptic_device_->create_connection();
-  RCLCPP_INFO(this->get_logger(), "\033[0;32mHaptic device connection started\033[0m");
+  RCLCPP_INFO(this->get_logger(),
+              "\033[0;32mHaptic device connection started\033[0m");
   // Wait until haptic device starts publishing
   while (!haptic_device_->received_haptic_pose_) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
@@ -421,20 +425,21 @@ void HapticControlBase::control_thread() {
       base_link_name_;
   target_pose_tf_.child_frame_id = "haptic_interface_target";
 
-  
   // Apply delta position
   target_pose_.pose.position.x =
-  ee_starting_position.pose.position.x + position_error.x();
+      ee_starting_position.pose.position.x + position_error.x();
   target_pose_.pose.position.y =
-  ee_starting_position.pose.position.y + position_error.y();
+      ee_starting_position.pose.position.y + position_error.y();
   target_pose_.pose.position.z =
-  ee_starting_position.pose.position.z + position_error.z();
+      ee_starting_position.pose.position.z + position_error.z();
   target_pose_tf_.transform.translation =
-  point_to_vector3(target_pose_.pose.position);
-  
+      point_to_vector3(target_pose_.pose.position);
+
   // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-  //                      "Target_position: %f %f %f", target_pose_.pose.position.x,
-  //                       target_pose_.pose.position.y, target_pose_.pose.position.z);
+  //                      "Target_position: %f %f %f",
+  //                      target_pose_.pose.position.x,
+  //                       target_pose_.pose.position.y,
+  //                       target_pose_.pose.position.z);
 
   // Apply delta rotation
   Eigen::Quaterniond target_orientation = orientation_error * qEEStart_;
@@ -491,30 +496,30 @@ void HapticControlBase::control_thread() {
   }
   target_pose_vf_buffer_.push(target_pose_vf_);
 
-  // Publish current end-effector pose
-  geometry_msgs::msg::PoseStamped ee_pose_msg;
-  ee_pose_msg.header.stamp = ee_pose.header.stamp;
-  ee_pose_msg.header.frame_id = base_link_name_;
-  ee_pose_msg.pose.position = vector3_to_point(ee_pose.transform.translation);
-  ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
-  current_frame_pub_->publish(ee_pose_msg);
+// Publish current end-effector pose
+geometry_msgs::msg::PoseStamped ee_pose_msg;
+ee_pose_msg.header.stamp = ee_pose.header.stamp;
+ee_pose_msg.header.frame_id = base_link_name_;
+ee_pose_msg.pose.position = vector3_to_point(ee_pose.transform.translation);
+ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
+current_frame_pub_->publish(ee_pose_msg);
 
-  if (use_fixtures_ || use_ccbf_) {
-    // Publish filtered and desired pose
-    target_frame_pub_->publish(target_pose_vf_buffer_.peek());
-    desired_frame_pub_->publish(target_pose_);
-  } else {
-    // Publish target pose
-    target_frame_pub_->publish(target_pose_buffer_.peek());
-  }
+if (use_fixtures_ || use_ccbf_) {
+  // Publish filtered and desired pose
+  target_frame_pub_->publish(target_pose_vf_buffer_.peek());
+  desired_frame_pub_->publish(target_pose_);
+} else {
+  // Publish target pose
+  target_frame_pub_->publish(target_pose_buffer_.peek());
+}
 
-  tf_broadcaster_->sendTransform(target_pose_tf_);
+tf_broadcaster_->sendTransform(target_pose_tf_);
 
-  // Update old pose
-  x_old_ = x_new_;
-  x_new_ << haptic_device_->haptic_current_pose_.pose.position.x,
-      haptic_device_->haptic_current_pose_.pose.position.y,
-      haptic_device_->haptic_current_pose_.pose.position.z;
+// Update old pose
+x_old_ = x_new_;
+x_new_ << haptic_device_->haptic_current_pose_.pose.position.x,
+    haptic_device_->haptic_current_pose_.pose.position.y,
+    haptic_device_->haptic_current_pose_.pose.position.z;
 }
 void HapticControlBase::project_target_on_sphere(
     Eigen::Vector3d &target_position_vec, double safety_sphere_radius_) {

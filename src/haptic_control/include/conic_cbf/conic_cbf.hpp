@@ -112,9 +112,6 @@ Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
   Eigen::Vector3d omega_opt(u(0), u(1), u(2));
   // std::cout << "Omega abs error: " << (omega - omega_opt).norm() << std::endl;
 
-  // filter to max ang vel
-  omega_opt = std::min(omega_opt.norm(), 0.3) * omega_opt.normalized();
-
   Eigen::Vector3d angle = omega_opt * dt;
   Eigen::Matrix3d R_opt = R * exp_map(angle);
   // std::cout << "R now\n: "<< R << std::endl;

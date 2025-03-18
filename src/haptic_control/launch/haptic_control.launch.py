@@ -45,7 +45,7 @@ def launch_setup(context):
                     {"use_fixtures": LaunchConfiguration("use_fixtures")},
                     {"delay": LaunchConfiguration("delay")},
                 ],
-                prefix=["xterm -hold -fa 'Monospace' -fs 14 -e "],
+                # prefix=["xterm -hold -fa 'Monospace' -fs 14 -e "],
                 output='screen',
                 emulate_tty=True,
                 arguments=[('__log_level:=debug')]
@@ -53,7 +53,7 @@ def launch_setup(context):
         ],
     )
     # load rviz if use_fixtures is true using ifcondition
-    rviz = Node(
+    rviz_vf = Node(
         package="rviz2",
         executable="rviz2",
         name="rviz2",
@@ -61,7 +61,15 @@ def launch_setup(context):
         arguments=["-d", get_package_share_directory("haptic_control") + "/rviz/vf.rviz"],
         condition=LaunchConfigurationEquals("use_fixtures", "true"),
     )
-    return [haptic_wrapper, vf_node, rviz]
+    rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="screen",
+        arguments=["-d", get_package_share_directory("haptic_control") + "/rviz/rviz.rviz"],
+        condition=LaunchConfigurationEquals("use_fixtures", "false"),
+    )
+    return [haptic_wrapper, vf_node, rviz_vf, rviz]
     
 
 
