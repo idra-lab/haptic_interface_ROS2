@@ -2,7 +2,7 @@
 #define CONIC_CBF_QP_HPP
 #include <unsupported/Eigen/MatrixFunctions>
 #include "mesh_virtual_fixtures/qp_wrapper.hpp"
-
+#include "rclcpp/rclcpp.hpp"
 namespace conic_cbf {
 
 Eigen::Matrix3d skew(Eigen::Vector3d &omega) {
@@ -46,13 +46,13 @@ inline Eigen::Vector3d L_gh(Eigen::Matrix3d &R, Eigen::Vector3d &e_w,
   return -e_ref.transpose() * R * skew(e_w);
 }
 
-bool is_inside_cone(const Eigen::Quaterniond &q, const Eigen::Quaterniond &q_ref,
-                    const Eigen::Vector3d &thetas) {
+double h_value(const Eigen::Quaterniond &q, const Eigen::Quaterniond &q_ref,
+               const Eigen::Vector3d &thetas) {
   Eigen::Matrix3d R = q.toRotationMatrix();
   Eigen::Matrix3d R_ref = q_ref.toRotationMatrix();
   Eigen::Vector3d e_w = Eigen::Vector3d::Unit(2);
   Eigen::Vector3d e_ref = R_ref.col(2);
-  return h(R, e_w, e_ref, thetas(2)) >= 0;
+  return h(R, e_w, e_ref, thetas(2));
 }
 
 Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
@@ -64,10 +64,11 @@ Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
   Eigen::Matrix3d R_new = q_new.toRotationMatrix();
 
   const int n_constraints = 3;
-  const double gamma = 100.0;
+  const double gamma = 50.0;
 
   qpOASES::Options qpOptions;
-  qpOptions.printLevel = qpOASES::PL_LOW;
+  // suppress output
+  qpOptions.printLevel = qpOASES::PL_NONE;
   qpOASES::QProblem min_problem(3, n_constraints,
                                 qpOASES::HessianType::HST_IDENTITY);
   min_problem.setOptions(qpOptions);
@@ -90,35 +91,37 @@ Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
   }
 
   int nWSR = 200;
-  min_problem.init(0, g.data(), A.data(), 0, 0, A_lb.data(), 0, nWSR);
+  // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Solving QP");
 
-  Eigen::Vector<real_t, 3> u;
-  auto status = min_problem.getPrimalSolution(u.data());
+  auto status =
+      min_problem.init(0, g.data(), A.data(), 0, 0, A_lb.data(), 0, nWSR);
+
   if (status != qpOASES::SUCCESSFUL_RETURN) {
-    std::cerr << "Error in init: "
-              << qpOASES::MessageHandling::getErrorCodeMessage(status)
-              << std::endl;
-    exit(1);
+    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Infeasible");
+    return q;
   }
-  // std::cout << "Barrier value 1: "
-  //           << h(R, Eigen::Vector3d::Unit(0), R_ref.col(0), thetas(0))
-  //           << std::endl;
-  // std::cout << "Barrier value 2: "
-  //           << h(R, Eigen::Vector3d::Unit(1), R_ref.col(1), thetas(1))
-  //           << std::endl;
-  // std::cout << "Barrier value 3: "
-  //           << h(R, Eigen::Vector3d::Unit(2), R_ref.col(2), thetas(2))
-  //           << std::endl;
+  Eigen::Vector<real_t, 3> u;
+  min_problem.getPrimalSolution(u.data());
+
   Eigen::Vector3d omega_opt(u(0), u(1), u(2));
-  // std::cout << "Omega abs error: " << (omega - omega_opt).norm() << std::endl;
 
   Eigen::Vector3d angle = omega_opt * dt;
   Eigen::Matrix3d R_opt = R * exp_map(angle);
-  // std::cout << "R now\n: "<< R << std::endl;
-  // R = R_opt;
-  // std::cout << "R new\n: "<< R << std::endl;
-  // std::cout << " ------------------- " << std::endl;
-  Eigen::Quaterniond q_opt(R_opt);
+  
+  // Compute the angles between the corresponding axes
+  // Eigen::Vector3d angles;
+  // for (int i = 0; i < 3; ++i) {
+  //   double dot_product = R_ref.col(i).dot(R_opt.col(i));
+  //   dot_product = std::clamp(dot_product, -1.0,
+  //                            1.0);       // Ensure within valid range for acos
+  //   angles(i) = std::acos(dot_product);  // Compute angle in radians
+  // }
+  // // Print the angles in radians
+  // RCLCPP_INFO(this->get_logger(),
+  //             "Angles between corresponding axes: x: %f | y: %f | z: %f",
+  //             angles(0), angles(1), angles(2));
+  
+              Eigen::Quaterniond q_opt(R_opt);
   return q_opt;
 }
 

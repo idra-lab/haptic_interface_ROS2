@@ -16,13 +16,24 @@ class VFEnforcer {
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
                 "Starting VF Control node with name vf_control");
     mesh_type_ = node_->get_parameter("vf_parameters.mesh_type").as_string();
-    input_mesh_path_ = node_->get_parameter("vf_parameters.input_mesh_path").as_string();
-    output_mesh_path_ = node_->get_parameter("vf_parameters.output_mesh_path").as_string();
-    skin_mesh_path_ = node_->get_parameter("vf_parameters.skin_mesh_path").as_string();
-    tool_radius_ = node_->get_parameter("vf_parameters.tool_radius").as_double();
+    input_mesh_path_ =
+        node_->get_parameter("vf_parameters.input_mesh_path").as_string();
+    output_mesh_path_ =
+        node_->get_parameter("vf_parameters.output_mesh_path").as_string();
+    skin_mesh_path_ =
+        node_->get_parameter("vf_parameters.skin_mesh_path").as_string();
+    RCLCPP_INFO_STREAM(node->get_logger(), "\n\n \033Skin mesh path: "
+                                               << skin_mesh_path_ << "\033[0m");
+    RCLCPP_INFO_STREAM(
+        node->get_logger(),
+        "\033Input mesh path: " << input_mesh_path_ << "\033[0m \n\n");
+    tool_radius_ =
+        node_->get_parameter("vf_parameters.tool_radius").as_double();
     tool_vis_radius_ =
-        node_->get_parameter("vf_parameters.tool_visualization_radius").as_double();
-    lookup_area_ = node_->get_parameter("vf_parameters.lookup_area").as_double();
+        node_->get_parameter("vf_parameters.tool_visualization_radius")
+            .as_double();
+    lookup_area_ =
+        node_->get_parameter("vf_parameters.lookup_area").as_double();
     plane_size_ = node_->get_parameter("vf_parameters.plane_size").as_double();
 
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
@@ -64,7 +75,8 @@ class VFEnforcer {
                            << o3d_mesh->triangles_.size() << " triangles.");
     // Ensure the mesh has vertices
     if (o3d_mesh->vertices_.empty()) {
-      RCLCPP_ERROR_STREAM(node->get_logger(), "Mesh has no vertices, shutting down");
+      RCLCPP_ERROR_STREAM(node->get_logger(),
+                          "Mesh has no vertices, shutting down");
       rclcpp::shutdown();
     }
     o3d_mesh->RemoveDuplicatedVertices();
@@ -81,13 +93,12 @@ class VFEnforcer {
     }
     x_old_ << x_des[0], x_des[1], x_des[2];
     delta_x_ << 0.0, 0.0, 0.0;
-    
+
     RCLCPP_INFO_STREAM(node->get_logger(), "Computing mesh properties...");
     mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_,
                                    o3d_mesh->triangle_normals_);
     visualizer_->update_scene(constraint_planes_, x_des, x_old_,
                               tool_vis_radius_);
-
   }
 
   Eigen::Vector3d enforce_vf(Eigen::Vector3d x_des) {

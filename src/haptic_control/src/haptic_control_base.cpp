@@ -57,6 +57,8 @@ HapticControlBase::HapticControlBase(const std::string &name,
       RCLCPP_WARN(this->get_logger(),
                   "Using initial configuration as reference orientation");
     }
+  } else {
+    use_ccbf_ = false;
   }
   if (enable_safety_sphere_) {
     safety_sphere_radius_ =
@@ -314,13 +316,14 @@ void HapticControlBase::initialize_haptic_control() {
           "Initial configuration quaternion: x: %f | y: %f | z: %f | w: %f",
           q_ref_.x(), q_ref_.y(), q_ref_.z(), q_ref_.w());
     }
-    Eigen::Vector3d euler_angles =
-        qEEStart_.toRotationMatrix().eulerAngles(0, 1, 2);
-    if (!conic_cbf::is_inside_cone(qEEStart_, q_ref_, thetas_)) {
+    double h_value = conic_cbf::h_value(qEEStart_, q_ref_, thetas_);
+    if (h_value <= 0.0) {
       RCLCPP_ERROR(this->get_logger(),
                    "Current orientation is not inside the cone, consider "
                    "changing 'ccbf_q_ref' or 'ccbf_thetas' parameters");
       rclcpp::shutdown();
+    } else {
+      RCLCPP_INFO(this->get_logger(), "cbf value: %f", h_value);
     }
   }
   // Start haptic device connection
@@ -408,7 +411,8 @@ void HapticControlBase::control_thread() {
   }
   // else{
   //   RCLCPP_INFO(this->get_logger(), "Robot pose updated after %f seconds",
-  //               (this->get_clock()->now() - last_robot_pose_update_time_).seconds());
+  //               (this->get_clock()->now() -
+  //               last_robot_pose_update_time_).seconds());
   // }
   first_control_loop_ = false;
 
@@ -486,44 +490,50 @@ void HapticControlBase::control_thread() {
     target_pose_vf_.pose.position = eigenToRosPoint(x_filtered);
     target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
   }
-  if (use_ccbf_) {
+  if (use_fixtures_ && use_ccbf_) {
     // // Apply virtual fixture constraints to orientation
     q_new_ = target_orientation;
-
-    auto q_opt =
-        conic_cbf::cbfOrientFilter(q_ref_, q_old_, q_new_, thetas_, 0.001);
-    // RCLCPP_INFO(this->get_logger(), "q_old: %f %f %f %f, q_opt: %f %f %f %f",
-    //             q_old_.x(), q_old_.y(), q_old_.z(), q_old_.w(), q_opt.x(),
-    //             q_opt.y(), q_opt.z(), q_opt.w());
+    double h_value = conic_cbf::h_value(q_old_, q_ref_, thetas_);
+    // RCLCPP_INFO(this->get_logger(), "h_value: %f", h_value);
+    // RCLCPP_INFO(this->get_logger(),
+    //             "q_old: %f %f %f %f, q_ref: %f %f %f %f, q_new: %f %f %f %f",
+    //             q_old_.x(), q_old_.y(), q_old_.z(), q_old_.w(), q_ref_.x(),
+    //             q_ref_.y(), q_ref_.z(), q_ref_.w(), q_new_.x(), q_new_.y(),
+    //             q_new_.z(), q_new_.w());
+    // RCLCPP_INFO(this->get_logger(), "h_value1: %f", h_value);
+    auto q_opt = conic_cbf::cbfOrientFilter(q_ref_, q_old_, q_new_, thetas_,
+                                            1.0 / haptic_control_rate_);
     q_old_ = q_opt;
+
     target_pose_vf_.pose.orientation = eigenToRosQuat(q_opt);
+    target_pose_tf_.transform.rotation = target_pose_vf_.pose.orientation;
   }
   target_pose_vf_buffer_.push(target_pose_vf_);
 
-// Publish current end-effector pose
-geometry_msgs::msg::PoseStamped ee_pose_msg;
-ee_pose_msg.header.stamp = ee_pose.header.stamp;
-ee_pose_msg.header.frame_id = base_link_name_;
-ee_pose_msg.pose.position = vector3_to_point(ee_pose.transform.translation);
-ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
-current_frame_pub_->publish(ee_pose_msg);
+  // Publish current end-effector pose
+  geometry_msgs::msg::PoseStamped ee_pose_msg;
+  ee_pose_msg.header.stamp = ee_pose.header.stamp;
+  ee_pose_msg.header.frame_id = base_link_name_;
+  ee_pose_msg.pose.position = vector3_to_point(ee_pose.transform.translation);
+  ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
+  current_frame_pub_->publish(ee_pose_msg);
 
-if (use_fixtures_ || use_ccbf_) {
-  // Publish filtered and desired pose
-  target_frame_pub_->publish(target_pose_vf_buffer_.peek());
-  desired_frame_pub_->publish(target_pose_);
-} else {
-  // Publish target pose
-  target_frame_pub_->publish(target_pose_buffer_.peek());
-}
+  if (use_fixtures_) {
+    // Publish filtered and desired pose
+    target_frame_pub_->publish(target_pose_vf_buffer_.peek());
+    desired_frame_pub_->publish(target_pose_);
+  } else {
+    // Publish target pose
+    target_frame_pub_->publish(target_pose_buffer_.peek());
+  }
 
-tf_broadcaster_->sendTransform(target_pose_tf_);
+  tf_broadcaster_->sendTransform(target_pose_tf_);
 
-// Update old pose
-x_old_ = x_new_;
-x_new_ << haptic_device_->haptic_current_pose_.pose.position.x,
-    haptic_device_->haptic_current_pose_.pose.position.y,
-    haptic_device_->haptic_current_pose_.pose.position.z;
+  // Update old pose
+  x_old_ = x_new_;
+  x_new_ << haptic_device_->haptic_current_pose_.pose.position.x,
+      haptic_device_->haptic_current_pose_.pose.position.y,
+      haptic_device_->haptic_current_pose_.pose.position.z;
 }
 void HapticControlBase::project_target_on_sphere(
     Eigen::Vector3d &target_position_vec, double safety_sphere_radius_) {
