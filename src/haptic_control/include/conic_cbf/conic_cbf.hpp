@@ -64,7 +64,7 @@ Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
   Eigen::Matrix3d R_new = q_new.toRotationMatrix();
 
   const int n_constraints = 3;
-  const double gamma = 50.0;
+  const double gamma = 0.01;
 
   qpOASES::Options qpOptions;
   // suppress output
@@ -105,23 +105,24 @@ Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
 
   Eigen::Vector3d omega_opt(u(0), u(1), u(2));
 
-  Eigen::Vector3d angle = omega_opt * dt;
+  Eigen::Vector3d angle = omega_opt; // * dt;
+  // Eigen::Vector3d angle = omega; //* dt;
   Eigen::Matrix3d R_opt = R * exp_map(angle);
-  
+
   // Compute the angles between the corresponding axes
   // Eigen::Vector3d angles;
   // for (int i = 0; i < 3; ++i) {
   //   double dot_product = R_ref.col(i).dot(R_opt.col(i));
   //   dot_product = std::clamp(dot_product, -1.0,
-  //                            1.0);       // Ensure within valid range for acos
+  //                            1.0);       // Ensure within valid range for
   //   angles(i) = std::acos(dot_product);  // Compute angle in radians
   // }
   // // Print the angles in radians
-  // RCLCPP_INFO(this->get_logger(),
+  // RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
   //             "Angles between corresponding axes: x: %f | y: %f | z: %f",
   //             angles(0), angles(1), angles(2));
-  
-              Eigen::Quaterniond q_opt(R_opt);
+
+  Eigen::Quaterniond q_opt(R_opt);
   return q_opt;
 }
 
