@@ -22,6 +22,31 @@ HapticControlBase::HapticControlBase(const std::string &name,
       this->get_parameter("enable_safety_sphere").as_bool();
   RCLCPP_INFO(this->get_logger(), "Safety sphere enabled: %d",
               this->enable_safety_sphere_);
+  // safety box dimension
+  this->enable_safety_box_ = this->get_parameter("enable_safety_box").as_bool();
+  if (this->enable_safety_box_) {
+    // not implemented yet
+    this->safety_box_width_ =
+        this->get_parameter("safety_box_width").as_double();  // x
+    this->safety_box_length_ =
+        this->get_parameter("safety_box_length").as_double();  // y
+    this->safety_box_height_ =
+        this->get_parameter("safety_box_height").as_double();  // z
+  } else {
+    this->safety_box_width_ = std::numeric_limits<double>::infinity();
+    this->safety_box_length_ = std::numeric_limits<double>::infinity();
+    this->safety_box_height_ = std::numeric_limits<double>::infinity();
+  }
+  this->get_parameter("ft_feedback_topic_name", ft_feedback_topic_name_);
+  this->get_parameter("target_frame_topic_name", target_frame_topic_name_);
+  this->get_parameter("max_force", max_force_);
+  this->force_scale_ = this->get_parameter("force_scale").as_double();
+  this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
+  this->base_link_name_ = this->get_parameter("base_link_name").as_string();
+  this->ft_link_name_ = this->get_parameter("ft_link_name").as_string();
+  this->haptic_control_rate_ =
+      this->get_parameter("haptic_control_rate").as_double();
+  this->ft_sensor_rate_ = this->get_parameter("ft_sensor_rate").as_double();
   // use virtual fixtures to constraint the robot over a mesh
   use_fixtures_ = this->get_parameter("use_fixtures").as_bool();
   if (use_fixtures_) {
@@ -67,31 +92,6 @@ HapticControlBase::HapticControlBase(const std::string &name,
   } else {
     safety_sphere_radius_ = std::numeric_limits<double>::infinity();
   }
-  // safety box dimension
-  this->enable_safety_box_ = this->get_parameter("enable_safety_box").as_bool();
-  if (this->enable_safety_box_) {
-    // not implemented yet
-    this->safety_box_width_ =
-        this->get_parameter("safety_box_width").as_double();  // x
-    this->safety_box_length_ =
-        this->get_parameter("safety_box_length").as_double();  // y
-    this->safety_box_height_ =
-        this->get_parameter("safety_box_height").as_double();  // z
-  } else {
-    this->safety_box_width_ = std::numeric_limits<double>::infinity();
-    this->safety_box_length_ = std::numeric_limits<double>::infinity();
-    this->safety_box_height_ = std::numeric_limits<double>::infinity();
-  }
-  this->get_parameter("ft_feedback_topic_name", ft_feedback_topic_name_);
-  this->get_parameter("target_frame_topic_name", target_frame_topic_name_);
-  this->get_parameter("max_force", max_force_);
-  this->force_scale_ = this->get_parameter("force_scale").as_double();
-  this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
-  this->base_link_name_ = this->get_parameter("base_link_name").as_string();
-  this->ft_link_name_ = this->get_parameter("ft_link_name").as_string();
-  this->haptic_control_rate_ =
-      this->get_parameter("haptic_control_rate").as_double();
-  this->ft_sensor_rate_ = this->get_parameter("ft_sensor_rate").as_double();
 
   // delay simulation
   delay_loop_haptic_ = delay_loop_ft_ = 1;
@@ -325,6 +325,9 @@ void HapticControlBase::initialize_haptic_control() {
     } else {
       RCLCPP_INFO(this->get_logger(), "cbf value: %f", h_value);
     }
+  } else {
+    vis_ =
+        std::make_shared<Visualizer>(this->shared_from_this(), base_link_name_);
   }
   // Start haptic device connection
   haptic_device_->create_connection();
@@ -493,7 +496,7 @@ void HapticControlBase::control_thread() {
   if (use_fixtures_ && use_ccbf_) {
     // // Apply virtual fixture constraints to orientation
     q_new_ = target_orientation;
-    double h_value = conic_cbf::h_value(q_old_, q_ref_, thetas_);
+    // double h_value = conic_cbf::h_value(q_old_, q_ref_, thetas_);
     // RCLCPP_INFO(this->get_logger(), "h_value: %f", h_value);
     // RCLCPP_INFO(this->get_logger(),
     //             "q_old: %f %f %f %f, q_ref: %f %f %f %f, q_new: %f %f %f %f",
@@ -525,6 +528,8 @@ void HapticControlBase::control_thread() {
   } else {
     // Publish target pose
     target_frame_pub_->publish(target_pose_buffer_.peek());
+    vis_->update_scene(
+        eigenFromRosPoint(target_pose_buffer_.peek().pose.position));
   }
 
   tf_broadcaster_->sendTransform(target_pose_tf_);

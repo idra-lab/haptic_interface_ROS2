@@ -3,9 +3,9 @@
 #include <omp.h>
 #include <Eigen/Core>
 #include <rclcpp/rclcpp.hpp>
-#include "mesh.hpp"
-#include "vf_computation.hpp"
-#include "visualization.hpp"
+#include "mesh_virtual_fixtures/mesh.hpp"
+#include "mesh_virtual_fixtures/vf_computation.hpp"
+#include "utils/visualization.hpp"
 
 class VFEnforcer {
  public:

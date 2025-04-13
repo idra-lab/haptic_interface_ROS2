@@ -29,6 +29,7 @@ https://ieeexplore.ieee.org/document/9341590/
 #include "tf2_ros/transform_broadcaster.h"
 #include "utils/circular_buffer.hpp"
 #include "utils/conversions.hpp"
+#include "utils/visualization.hpp"
 
 class HapticControlBase : public rclcpp::Node {
  public:
@@ -134,6 +135,9 @@ class HapticControlBase : public rclcpp::Node {
   std::shared_ptr<VFEnforcer> vf_enforcer_;
   // ros control_thread_
   rclcpp::TimerBase::SharedPtr control_thread_;
+
+  // Rviz visualization
+  std::shared_ptr<Visualizer> vis_;
 };
 
 #endif  // __HAPTIC_CONTROL_BASE__

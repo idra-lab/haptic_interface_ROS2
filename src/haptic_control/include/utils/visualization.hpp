@@ -3,7 +3,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
-#include "location.hpp"
+#include "mesh_virtual_fixtures/location.hpp"
 
 using namespace std::chrono_literals;
 class Visualizer {
@@ -117,7 +117,22 @@ class Visualizer {
     }
     marker_pub_->publish(marker_array);
   }
-
+  void update_scene(Eigen::Vector3d target) {
+    visualization_msgs::msg::MarkerArray marker_array;
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = reference_frame_;
+    marker.header.stamp = node_->now();
+    marker.type = visualization_msgs::msg::Marker::SPHERE;
+    marker.ns = "target_pose";
+    marker.id = 2;
+    marker.pose.position.x = target(0);
+    marker.pose.position.y = target(1);
+    marker.pose.position.z = target(2);
+    marker.color.r = 0.0;
+    marker.color.g = 1.0;
+    marker_array.markers.push_back(marker);
+    marker_pub_->publish(marker_array);
+  }
   void update_scene(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>
                         constraint_planes,
                     Eigen::Vector3d target, Eigen::Vector3d vf_pose,
@@ -185,13 +200,20 @@ class Visualizer {
     }
     marker_pub_->publish(marker_array);
   }
+  void init_publisher() {
+    marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
+        "visualization_marker", 1);
+  }
   Visualizer(std::shared_ptr<rclcpp::Node> node, std::string reference_frame,
              double plane_size)
       : node_(node),
         reference_frame_(reference_frame),
         plane_size_(plane_size) {
-    marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
-        "visualization_marker", 1);
+    init_publisher();
+  }
+  Visualizer(std::shared_ptr<rclcpp::Node> node, std::string reference_frame)
+      : node_(node), reference_frame_(reference_frame) {
+    init_publisher();
   }
 };
 

@@ -2,7 +2,7 @@
 #define VF_COMPUTATION_HPP
 #define DEBUG true
 #include "qp_wrapper.hpp"
-#include "visualization.hpp"
+#include "utils/visualization.hpp"
 
 namespace compute_vf {
 template <typename Scalar>
@@ -231,13 +231,13 @@ Eigen::Vector3d enforce_virtual_fixture(
   real_t x_ub[3] = {max_delta, max_delta, max_delta};     // upper bound
   qpOASES::Options myOptions;
   myOptions.printLevel = qpOASES::PL_LOW;
-  qpOASES::QProblem min_problem(3, n_constraints, qpOASES::HessianType::HST_IDENTITY);
+  qpOASES::QProblem min_problem(3, n_constraints,
+                                qpOASES::HessianType::HST_IDENTITY);
   min_problem.setOptions(myOptions);
   Eigen::Vector<real_t, 3> delta_x;
   int nWSR = 200;
   if (n_constraints != 0) {
-    min_problem.init(0, g.data(), A.data(), x_lb, x_ub, A_lb.data(), 0,
-                     nWSR);
+    min_problem.init(0, g.data(), A.data(), x_lb, x_ub, A_lb.data(), 0, nWSR);
   }
   // catch no solution
   if (min_problem.isInitialised() == false) {
