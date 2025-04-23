@@ -194,11 +194,15 @@ Eigen::Vector3d enforce_virtual_fixture(
   const int n_constraints = constraint_planes.size();
   // std::cout << "Found " << n_constraints << " constraints" << std::endl;
   Eigen::Vector3d delta_x_des = target_position - current_position;
+  // if (n_constraints == 0) {
+  //   return delta_x_des;
+  // } else {
+  auto direction = target_position - current_position;
+  double step_size = std::min(direction.norm(), radius / 10);
+  // }
   if (n_constraints == 0) {
-    return delta_x_des;
-  } else {
-    auto direction = target_position - current_position;
-    double step_size = std::min(direction.norm(), radius / 10);
+    return direction.normalized() * 0.00016;
+  }else{
     delta_x_des = direction.normalized() * step_size;
   }
 
@@ -225,7 +229,7 @@ Eigen::Vector3d enforce_virtual_fixture(
   }
 
   // Assuming x is of dimension 3
-  const float max_delta = 0.0001;
+  const float max_delta = 0.00002;
   // adding constraint on max delta to avoid oscillations between two points
   real_t x_lb[3] = {-max_delta, -max_delta, -max_delta};  // lower bound
   real_t x_ub[3] = {max_delta, max_delta, max_delta};     // upper bound

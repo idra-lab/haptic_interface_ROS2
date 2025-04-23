@@ -44,6 +44,7 @@ HapticControlBase::HapticControlBase(const std::string &name,
   this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
   this->base_link_name_ = this->get_parameter("base_link_name").as_string();
   this->ft_link_name_ = this->get_parameter("ft_link_name").as_string();
+  this->tool_vis_radius_ = this->get_parameter("tool_vis_radius").as_double();
   this->haptic_control_rate_ =
       this->get_parameter("haptic_control_rate").as_double();
   this->ft_sensor_rate_ = this->get_parameter("ft_sensor_rate").as_double();
@@ -183,8 +184,8 @@ HapticControlBase::HapticControlBase(const std::string &name,
       q_haptic_base_to_robot_base_.x(), q_haptic_base_to_robot_base_.y(),
       q_haptic_base_to_robot_base_.z(), q_haptic_base_to_robot_base_.w());
   haptic_device_ =
-      std::make_shared<SystemInterface>(q_haptic_base_to_robot_base_);
-
+      std::make_shared<SystemInterface>(q_haptic_base_to_robot_base_, force_scale_);
+  last_robot_pose_update_time_ = this->get_clock()->now();
   // new haptic pose
   x_new_ << 0.0, 0.0, 0.0;
   // old haptic pose
@@ -199,7 +200,7 @@ void HapticControlBase::init_vf_enforcer() {
   // Init virtual fixture enforcer
   vf_enforcer_ = std::make_shared<VFEnforcer>(
       this->shared_from_this(), eigenFromRosPoint(target_pose_.pose.position),
-      this->base_link_name_);
+      this->base_link_name_, this->tool_vis_radius_);
   RCLCPP_INFO(this->get_logger(),
               "\033[0;32mVirtual fixture enforcer initialized\033[0m");
 }
@@ -234,7 +235,7 @@ void HapticControlBase::set_safety_box_height_CB(const rclcpp::Parameter &p) {
 }
 
 void HapticControlBase::store_wrench(
-    const geometry_msgs::msg::WrenchStamped target_wrench) {
+    const geometry_msgs::msg::WrenchStamped &target_wrench) {
   current_wrench_.header.stamp = target_wrench.header.stamp;
 
   geometry_msgs::msg::WrenchStamped wrench_stamped;
@@ -263,6 +264,10 @@ void HapticControlBase::get_ee_trans(
     trans = tf_buffer_->lookupTransform(base_link_name_, tool_link_name_,
                                         tf2::TimePointZero);
     received_ee_pose_ = true;
+    // RCLCPP_INFO_STREAM_THROTTLE(
+    //     this->get_logger(), *this->get_clock(), 1,
+    //     ((rclcpp::Time)trans.header.stamp - last_robot_pose_update_time_)
+    //         .seconds());
     last_robot_pose_update_time_ = trans.header.stamp;
   } catch (tf2::TransformException &ex) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
@@ -398,27 +403,20 @@ Eigen::Quaterniond HapticControlBase::compute_orientation_error() {
 
 void HapticControlBase::control_thread() {
   if (!haptic_device_->received_haptic_pose_) {
-    RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                          "Haptic pose not available");
+    RCLCPP_ERROR_SKIPFIRST_THROTTLE(this->get_logger(), *this->get_clock(),
+                                    1000, "Haptic pose not available");
     return;
   }
-
   // Robot data consistency check
   if (!first_control_loop_ &&
       (this->get_clock()->now() - last_robot_pose_update_time_).seconds() >
-          2.0) {
+          3.0) {
     RCLCPP_ERROR(
         this->get_logger(),
-        "Robot pose not updated within the last 2 seconds, shutting down");
+        "Robot pose not updated within the last 3 seconds, shutting down");
     rclcpp::shutdown();
   }
-  // else{
-  //   RCLCPP_INFO(this->get_logger(), "Robot pose updated after %f seconds",
-  //               (this->get_clock()->now() -
-  //               last_robot_pose_update_time_).seconds());
-  // }
   first_control_loop_ = false;
-
   // Update haptic device pose with safety sphere check
   x_tilde_new_ =
       enable_safety_sphere_ ? x_tilde_old_ + (x_new_ - x_old_) : x_new_;
@@ -494,18 +492,17 @@ void HapticControlBase::control_thread() {
     target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
   }
   if (use_fixtures_ && use_ccbf_) {
+    
     // // Apply virtual fixture constraints to orientation
-    q_new_ = target_orientation;
-    // double h_value = conic_cbf::h_value(q_old_, q_ref_, thetas_);
-    // RCLCPP_INFO(this->get_logger(), "h_value: %f", h_value);
-    // RCLCPP_INFO(this->get_logger(),
-    //             "q_old: %f %f %f %f, q_ref: %f %f %f %f, q_new: %f %f %f %f",
-    //             q_old_.x(), q_old_.y(), q_old_.z(), q_old_.w(), q_ref_.x(),
-    //             q_ref_.y(), q_ref_.z(), q_ref_.w(), q_new_.x(), q_new_.y(),
-    //             q_new_.z(), q_new_.w());
-    // RCLCPP_INFO(this->get_logger(), "h_value1: %f", h_value);
-    auto q_opt = conic_cbf::cbfOrientFilter(q_ref_, q_old_, q_new_, thetas_,
-                                            1.0 / haptic_control_rate_);
+    //* 
+    // q_new_ = target_orientation;
+    // auto q_opt = conic_cbf::cbfOrientFilter(q_ref_, q_old_, q_new_, thetas_,
+    //                                         1.0 / haptic_control_rate_);
+    // q_old_ = q_opt;
+    //*
+
+    auto q_opt = vf_enforcer_->enforce_orientation_constraints(
+        target_orientation, q_old_, q_ref_, thetas_, 1.0 / haptic_control_rate_);
     q_old_ = q_opt;
 
     target_pose_vf_.pose.orientation = eigenToRosQuat(q_opt);
@@ -517,9 +514,11 @@ void HapticControlBase::control_thread() {
   geometry_msgs::msg::PoseStamped ee_pose_msg;
   ee_pose_msg.header.stamp = ee_pose.header.stamp;
   ee_pose_msg.header.frame_id = base_link_name_;
-  ee_pose_msg.pose.position = vector3_to_point(ee_pose.transform.translation);
+  ee_pose_msg.pose.position =
+  vector3_to_point(ee_pose.transform.translation);
   ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
   current_frame_pub_->publish(ee_pose_msg);
+  // current_frame_pub_->publish(ee_current_pose_);
 
   if (use_fixtures_) {
     // Publish filtered and desired pose
@@ -529,10 +528,11 @@ void HapticControlBase::control_thread() {
     // Publish target pose
     target_frame_pub_->publish(target_pose_buffer_.peek());
     vis_->update_scene(
-        eigenFromRosPoint(target_pose_buffer_.peek().pose.position));
+        eigenFromRosPoint(target_pose_buffer_.peek().pose.position),
+        tool_vis_radius_);
   }
 
-  tf_broadcaster_->sendTransform(target_pose_tf_);
+  // tf_broadcaster_->sendTransform(target_pose_tf_);
 
   // Update old pose
   x_old_ = x_new_;

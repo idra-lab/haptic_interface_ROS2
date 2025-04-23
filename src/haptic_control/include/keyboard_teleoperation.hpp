@@ -133,6 +133,7 @@ Press Ctrl-C to quit.
   Eigen::Vector3d thetas;
   std::array<double, 7> cur_pose_;
   std::array<double, 3> bounding_box_center_;
+  double tool_vis_radius_;
   std::shared_ptr<VFEnforcer> vf_enforcer_;
 
   // current haptic positions

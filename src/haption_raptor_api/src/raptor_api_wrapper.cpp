@@ -121,8 +121,8 @@ class RaptorAPIWrapper : public rclcpp::Node {
     // Watchdog on receiving pose setpoint
     if ((_now - last_loop_date) > 30000000) {
       RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                  "Timeout on set pose: %ld, going to state READY",
-                  _now - last_loop_date);
+                   "Timeout on set pose: %ld, going to state READY",
+                   _now - last_loop_date);
       Reset();
       return;
     }
@@ -154,8 +154,8 @@ class RaptorAPIWrapper : public rclcpp::Node {
     // Watchdog on receiving speed setpoint
     if ((_now - last_loop_date) > 30000000) {
       RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                  "Timeout on set speed: %ld, going to state READY",
-                  _now - last_loop_date);
+                   "Timeout on set speed: %ld, going to state READY",
+                   _now - last_loop_date);
       Reset();
       return;
     }
@@ -185,10 +185,10 @@ class RaptorAPIWrapper : public rclcpp::Node {
       //             set_force[5]);
     }
     // Watchdog on receiving force setpoint
-    if ((_now - last_loop_date) > 30000000) {
+    if ((_now - last_loop_date) > 90000000) {
       RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                  "Timeout on set force: %ld, going to state READY",
-                  _now - last_loop_date);
+                   "Timeout on set force: %ld, going to state READY",
+                   _now - last_loop_date);
       Reset();
       return;
     }
@@ -282,7 +282,7 @@ class RaptorAPIWrapper : public rclcpp::Node {
               // button!")
               break;
             case HAPTION::CalibrationStatus::C_CALIBRATIONFAILED:
-              RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+              RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                           "Calibration has failed, please restart again (Maybe "
                           "you forgot to unpress the green button?)");
               break;
@@ -849,11 +849,11 @@ class RaptorAPIWrapper : public rclcpp::Node {
         Reset();
       }
     }
-
+    
     // Get status of force-feedback
     HAPTION::PowerStatus powerStatus;
     raptorHandle.GetPowerStatus(powerStatus);
-
+    
     // Get the current pose and speed of the force-feedback device
     HAPTION::Displacement manipPose;
     (void)raptorHandle.GetCartesianPose(manipPose);
@@ -911,10 +911,11 @@ class RaptorAPIWrapper : public rclcpp::Node {
 
     // Watchdog on receiving force setpoint
     if (isFirstSetpointReceived &&
-        abs((int64_t)last_in_date - (int64_t)last_loop_date) > 30000000) {
-      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                  "Impedance thread: Timeout on set force: %ld, going to state READY",
-                  last_in_date - last_loop_date);
+        abs((int64_t)last_in_date - (int64_t)last_loop_date) > 90000000) {
+      RCLCPP_ERROR(
+          rclcpp::get_logger("rclcpp"),
+          "Impedance thread: Timeout on set force: %ld, going to state READY",
+          last_in_date - last_loop_date);
       Reset();
       return;
     }

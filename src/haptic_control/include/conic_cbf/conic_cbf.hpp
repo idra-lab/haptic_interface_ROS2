@@ -58,7 +58,7 @@ double h_value(const Eigen::Quaterniond &q, const Eigen::Quaterniond &q_ref,
 Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
                                    Eigen::Quaterniond &q,
                                    const Eigen::Quaterniond &q_new,
-                                   Eigen::Vector3d &thetas, double dt) {
+                                   Eigen::Vector3d &thetas) {
   Eigen::Matrix3d R_ref = q_ref.toRotationMatrix();
   Eigen::Matrix3d R = q.toRotationMatrix();
   Eigen::Matrix3d R_new = q_new.toRotationMatrix();
@@ -123,6 +123,7 @@ Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
   //             angles(0), angles(1), angles(2));
 
   Eigen::Quaterniond q_opt(R_opt);
+  q_opt.normalize();
   return q_opt;
 }
 

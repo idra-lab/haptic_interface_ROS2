@@ -8,15 +8,21 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 # PythonExpression
 from launch.conditions import LaunchConfigurationEquals
-
-
-
+import subprocess
+import os
+import datetime
+DEFAULT_INPUT_MESH_PATH = "/home/nardi/temp/vf_output/virtual_fixtures.obj"
+DEFAULT_SKIN_MESH_PATH = "/home/nardi/temp/vf_output/skin_mesh.obj"
+DEFAULT_BAG_PATH = "/home/nardi/temp/vf_output/exp_bag"
+DEFAULT_SKIN_PARAMS_PATH = "/home/nardi/temp/skel_output/optimized_skel_params.json"
 
 launch_args = [
     DeclareLaunchArgument("delay", default_value="0.0", description="Use this argument to simulate a delay in the system (in seconds), use 0.0 for no delay"),
     DeclareLaunchArgument("use_fixtures", default_value="false", description="Use this argument to activate the fixtures (true or false)"),
-    DeclareLaunchArgument("input_mesh_path", default_value="vf.obj", description="Use this argument to select the file to the virtual fixtures mesh"),
-    DeclareLaunchArgument("skin_mesh_path", default_value="skin.obj", description="Use this argument to select the file to the patient skin mesh"),
+    DeclareLaunchArgument("bag_path", default_value=DEFAULT_BAG_PATH, description="Use this argument to select the path to the bag file"),
+    DeclareLaunchArgument("input_mesh_path", default_value=DEFAULT_INPUT_MESH_PATH, description="Use this argument to select the file to the virtual fixtures mesh"),
+    DeclareLaunchArgument("skin_mesh_path", default_value=DEFAULT_SKIN_MESH_PATH, description="Use this argument to select the file to the patient skin mesh"),
+    DeclareLaunchArgument("skin_params_path", default_value=DEFAULT_SKIN_PARAMS_PATH, description="Use this argument to select the file to the skin parameters"),
     DeclareLaunchArgument("robot_type", default_value="kuka", description="Use this argument to select the robot type (ur3e, kuka)"),
 ]
 
@@ -25,9 +31,26 @@ def launch_setup(context):
     haptic_params = get_package_share_directory("haptic_control") + "/config/haptic_parameters.yaml"
     robot_params = get_package_share_directory("haptic_control") + "/config/" + LaunchConfiguration('robot_type').perform(context) + "_parameters.yaml"
     use_fixtures = True if LaunchConfiguration("use_fixtures").perform(context) == "true" else False
+
+    bag_path = LaunchConfiguration("bag_path").perform(context)
+    # remove folder if exists
+    os.system("rm -r " + "adjacency_dict*.txt")
+    if os.path.exists(bag_path):
+        datetime_now = datetime.datetime.now()
+        datetime_str = datetime_now.strftime("%Y-%m-%d_%H-%M-%S")
+        bag_path = bag_path[:-1] + "_" + datetime_str
+        print("\033[91m \n\nBag file already exists, creating another with suffix: ", datetime_str, "\033[0m")
+        # exit(0)
+    #     os.system("rm -r " + bag_path)
+    CMD = "ros2 bag record /current_frame /lbr/target_frame /desired_frame /lbr/force_torque_broadcaster/wrench /screen -o " + bag_path + " & "
+
+    subprocess.Popen(CMD, shell=True)
+
     print("\033[92m \n\nuse_fixtures: ", use_fixtures, "\033[0m")
+    print("\033[92m Recording bag in: ", bag_path, "\033[0m")
     input_mesh_path = LaunchConfiguration("input_mesh_path").perform(context)
     skin_mesh_path = LaunchConfiguration("skin_mesh_path").perform(context)
+    params_path = LaunchConfiguration("skin_params_path").perform(context)
     if use_fixtures:
         print("\033[92m \n\nUsing fixtures \033[0m")
         print("\033[92m input_mesh_path: ", input_mesh_path, "\033[0m")
@@ -56,6 +79,7 @@ def launch_setup(context):
                     {"use_fixtures": LaunchConfiguration("use_fixtures")},
                     {"vf_parameters.input_mesh_path": input_mesh_path},
                     {"vf_parameters.skin_mesh_path": skin_mesh_path},
+                    {"vf_parameters.skin_params_path": params_path},
                     {"robot_type": LaunchConfiguration("robot_type")},
                     {"delay": LaunchConfiguration("delay")},
                 ],

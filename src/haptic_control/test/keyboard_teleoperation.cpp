@@ -15,6 +15,7 @@ KeyboardControl::KeyboardControl(const std::string &name,
   // safety sphere around robot base link to prevent singularity
   this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
   this->base_link_name_ = this->get_parameter("base_link_name").as_string();
+  this->tool_vis_radius_ = this->get_parameter("tool_vis_radius").as_double();
   this->use_vf_ = this->get_parameter("use_fixtures").as_bool();
 
   target_pos_publisher_ =
@@ -42,7 +43,8 @@ void KeyboardControl::init_vf_enforcer() {
   vf_enforcer_ = std::make_shared<VFEnforcer>(
       this->shared_from_this(),
       Eigen::Vector3d(cur_pose_[0], cur_pose_[1], cur_pose_[2]),
-      this->base_link_name_);
+      this->base_link_name_,
+      this->tool_vis_radius_);
 }
 
 void KeyboardControl::readInput() {
@@ -93,7 +95,7 @@ void KeyboardControl::readInput() {
   if (use_vf_) {
     x_tilde_new_ = vf_enforcer_->enforce_vf(x_new_);
     auto q_opt =
-        conic_cbf::cbfOrientFilter(q_init, q_old, q_new, thetas, 0.001);
+        conic_cbf::cbfOrientFilter(q_init, q_old, q_new, thetas);
     q_old = q_opt;
   } else {
     x_tilde_new_ = x_new_;
