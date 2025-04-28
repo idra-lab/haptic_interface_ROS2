@@ -43,6 +43,7 @@ https://ieeexplore.ieee.org/document/9341590/
 #include "utils/circular_buffer.hpp"
 #include "utils/conversions.hpp"
 #include "utils/visualization.hpp"
+#include "utils/geometry.hpp"
 
 class HapticControlBase : public rclcpp::Node {
  public:
@@ -75,8 +76,6 @@ class HapticControlBase : public rclcpp::Node {
   void store_wrench(const geometry_msgs::msg::WrenchStamped &target_wrench);
   Eigen::Vector3d compute_position_error();
   Eigen::Quaterniond compute_orientation_error();
-  void project_target_on_sphere(Eigen::Vector3d &target_position_vec,
-                                double safety_sphere_radius_);
 
   // Public pose and transform data
   geometry_msgs::msg::TransformStamped target_pose_tf_;
@@ -126,7 +125,8 @@ class HapticControlBase : public rclcpp::Node {
 
   // Pose and wrench data
   geometry_msgs::msg::WrenchStamped current_wrench_;
-  geometry_msgs::msg::PoseStamped old_pose_, ee_starting_position, haptic_starting_pose_;
+  geometry_msgs::msg::PoseStamped old_pose_, ee_starting_position,
+      haptic_starting_pose_;
   CircularBuffer<geometry_msgs::msg::WrenchStamped> wrench_buffer_;
   CircularBuffer<geometry_msgs::msg::PoseStamped> target_pose_buffer_,
       target_pose_vf_buffer_;
@@ -150,6 +150,7 @@ class HapticControlBase : public rclcpp::Node {
   std::string target_frame_topic_name_;
   std::string ft_feedback_topic_name_;
   double safety_sphere_radius_;
+  Eigen::Vector3d safety_sphere_center_;
   double safety_box_width_, safety_box_length_, safety_box_height_;
   double max_force_;
   double force_scale_;

@@ -89,7 +89,15 @@ HapticControlBase::HapticControlBase(const std::string &name,
   if (enable_safety_sphere_) {
     safety_sphere_radius_ =
         this->get_parameter("safety_sphere_radius").as_double();
+    std::vector<double> safety_sphere_center =
+        this->get_parameter("safety_sphere_center").as_double_array();
     safety_sphere_radius_ = std::clamp(safety_sphere_radius_, 0.0, 2.0);
+    safety_sphere_center_ = Eigen::Vector3d(
+        Eigen::Map<Eigen::Vector3d>(safety_sphere_center.data()));
+    RCLCPP_INFO(this->get_logger(),
+                "Safety sphere center: x: %f | y: %f | z: %f and radius: %f",
+                safety_sphere_center_(0), safety_sphere_center_(1),
+                safety_sphere_center_(2), safety_sphere_radius_);
   } else {
     safety_sphere_radius_ = std::numeric_limits<double>::infinity();
   }
@@ -183,8 +191,8 @@ HapticControlBase::HapticControlBase(const std::string &name,
       "%f",
       q_haptic_base_to_robot_base_.x(), q_haptic_base_to_robot_base_.y(),
       q_haptic_base_to_robot_base_.z(), q_haptic_base_to_robot_base_.w());
-  haptic_device_ =
-      std::make_shared<SystemInterface>(q_haptic_base_to_robot_base_, force_scale_);
+  haptic_device_ = std::make_shared<SystemInterface>(
+      q_haptic_base_to_robot_base_, force_scale_);
   last_robot_pose_update_time_ = this->get_clock()->now();
   // new haptic pose
   x_new_ << 0.0, 0.0, 0.0;
@@ -293,7 +301,7 @@ void HapticControlBase::initialize_haptic_control() {
   if (enable_safety_sphere_) {
     Eigen::Vector3d ee_start =
         eigenFromRosPoint(ee_starting_position.pose.position);
-    if (ee_start.norm() > safety_sphere_radius_) {
+    if (ee_start.norm() < safety_sphere_radius_) {
       RCLCPP_ERROR(this->get_logger(),
                    "ERROR: End effector is outside the safety sphere, please "
                    "move it inside.");
@@ -462,15 +470,23 @@ void HapticControlBase::control_thread() {
                                         target_pose_.pose.position.y,
                                         target_pose_.pose.position.z);
 
+    const double distance_from_sphere_center =
+        (target_position_vec - safety_sphere_center_).norm();
     RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                         "Current distance: %f, safety sphere radius: %f",
-                         target_position_vec.norm(), safety_sphere_radius_);
-
-    if (target_position_vec.norm() > safety_sphere_radius_) {
-      project_target_on_sphere(target_position_vec, safety_sphere_radius_);
+                         "Current distance from safety sphere surface: %f",
+                         (distance_from_sphere_center - safety_sphere_radius_));
+    if (distance_from_sphere_center < safety_sphere_radius_) {
+      utils::project_target_on_sphere(
+          target_position_vec, safety_sphere_center_, safety_sphere_radius_);
     } else {
       x_tilde_old_ = x_tilde_new_;
     }
+
+    // draw sphere with alpha depending on distance from sphere surface
+
+    vis_->draw_safety_sphere(
+        safety_sphere_center_, safety_sphere_radius_,
+        utils::f_linear(distance_from_sphere_center, safety_sphere_radius_));
   }
 
   target_pose_buffer_.push(target_pose_);
@@ -492,17 +508,16 @@ void HapticControlBase::control_thread() {
     target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
   }
   if (use_fixtures_ && use_ccbf_) {
-    
     // // Apply virtual fixture constraints to orientation
-    //* 
+    //*
     // q_new_ = target_orientation;
-    // auto q_opt = conic_cbf::cbfOrientFilter(q_ref_, q_old_, q_new_, thetas_,
-    //                                         1.0 / haptic_control_rate_);
+    // auto q_opt = conic_cbf::cbfOrientFilter(q_ref_, q_old_, q_new_, thetas_);
     // q_old_ = q_opt;
     //*
 
     auto q_opt = vf_enforcer_->enforce_orientation_constraints(
-        target_orientation, q_old_, q_ref_, thetas_, 1.0 / haptic_control_rate_);
+        target_orientation, q_old_, q_ref_, thetas_,
+        1.0 / haptic_control_rate_);
     q_old_ = q_opt;
 
     target_pose_vf_.pose.orientation = eigenToRosQuat(q_opt);
@@ -514,8 +529,7 @@ void HapticControlBase::control_thread() {
   geometry_msgs::msg::PoseStamped ee_pose_msg;
   ee_pose_msg.header.stamp = ee_pose.header.stamp;
   ee_pose_msg.header.frame_id = base_link_name_;
-  ee_pose_msg.pose.position =
-  vector3_to_point(ee_pose.transform.translation);
+  ee_pose_msg.pose.position = vector3_to_point(ee_pose.transform.translation);
   ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
   current_frame_pub_->publish(ee_pose_msg);
   // current_frame_pub_->publish(ee_current_pose_);
@@ -539,11 +553,6 @@ void HapticControlBase::control_thread() {
   x_new_ << haptic_device_->haptic_current_pose_.pose.position.x,
       haptic_device_->haptic_current_pose_.pose.position.y,
       haptic_device_->haptic_current_pose_.pose.position.z;
-}
-void HapticControlBase::project_target_on_sphere(
-    Eigen::Vector3d &target_position_vec, double safety_sphere_radius_) {
-  target_position_vec =
-      target_position_vec.normalized() * safety_sphere_radius_;
 }
 
 int main(int argc, char **argv) {

@@ -8,6 +8,7 @@
 #include "utils/conversions.hpp"
 #include "utils/json.hpp"
 #include "utils/visualization.hpp"
+#include "utils/geometry.hpp"
 
 class VFEnforcer {
  public:
@@ -276,7 +277,16 @@ class VFEnforcer {
     colors.push_back({0.0, 1.0, 0.0});
     colors.push_back({0.0, 0.0, 1.0});
     visualizer_->draw_arrows(origins, axis, colors, 0);
-
+    // needs position ,direction and angle
+    std::vector<double> colors_x = {1.0, 0.0, 0.0, 0.7};
+    std::vector<double> colors_y = {0.0, 1.0, 0.0, 0.7};
+    std::vector<double> colors_z = {0.0, 0.0, 1.0, 0.7};
+    auto ori_x = utils::quaternion_from_vector3(x_axis);
+    auto ori_y = utils::quaternion_from_vector3(y_axis);
+    auto ori_z = utils::quaternion_from_vector3(z_axis);
+    visualizer_->draw_cone(x_old_, ori_x, thetas(0), 0, colors_x);
+    visualizer_->draw_cone(x_old_, ori_y, thetas(1), 1, colors_y);
+    visualizer_->draw_cone(x_old_, ori_z, thetas(2), 2, colors_z);
     q_ref_old_ = q_ref_new;
     q_opt_ = conic_cbf::cbfOrientFilter(q_ref_new, q_old, target_orientation,
                                         thetas);

@@ -9,8 +9,7 @@ haptic_control:
     simulated_delay: 0.0 # round trip simulated delay in seconds (0.0 for no delay)
     tool_vis_radius: 0.005 # radius of the end effector sphere for visualization in Rviz
 
-    enable_safety_sphere: false
-    safety_sphere_radius: 0.48
+
     min_x: -100.0
     max_x: 100.0
     min_y: -100.0
@@ -47,7 +46,8 @@ haptic_control:
       ccbf_params:
         use_initial_conf_as_q_ref: true # if true, the initial end effector orientation is used as the reference orientation
         ccbf_q_ref: [0.21006, 0.97703, 0.018034, 0.031066] # quaternion in the form [x, y, z, w] for the reference orientation of the end effector, considered only if use_initial_conf_as_q_ref is false
-        ccbf_thetas: [0.35 , 0.35, 0.35] # angle in radians for each axis of R_ref (which is q_ref as a rotation matrix)
+        # ccbf_thetas: [0.35 , 0.35, 0.35] # angle in radians for each axis of R_ref (which is q_ref as a rotation matrix)
+        ccbf_thetas: [0.3 , 0.3, 0.3]
 
 keyboard_control:
   ros__parameters:

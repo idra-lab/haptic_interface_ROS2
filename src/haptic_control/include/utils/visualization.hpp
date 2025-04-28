@@ -6,8 +6,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <unordered_map>
 #include <vector>
-#include "visualization_msgs/msg/marker_array.hpp"
 #include "mesh_virtual_fixtures/location.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
 
 class Visualizer {
  public:
@@ -40,7 +40,6 @@ class Visualizer {
         base_marker_.color.a = 1.0;
     base_marker_.mesh_use_embedded_materials = false;
   }
-
 
   void init_publisher() {
     marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
@@ -125,7 +124,6 @@ class Visualizer {
       const std::unordered_map<int, std::pair<Eigen::Vector3d, Location>>&
           points,
       double radius) {
-
     visualization_msgs::msg::Marker clear_marker;
     clear_marker.action = visualization_msgs::msg::Marker::DELETEALL;
     marker_array_.markers.push_back(clear_marker);
@@ -166,9 +164,29 @@ class Visualizer {
 
       marker_array_.markers.push_back(marker);
     }
-
   }
-
+  void draw_safety_sphere(const Eigen::Vector3d& center, double radius,
+                          double alpha) {
+    visualization_msgs::msg::Marker marker = base_marker_;
+    marker.header.stamp = node_->now();
+    marker.header.frame_id = reference_frame_;
+    marker.ns = "safety_sphere";
+    marker.id = 0;
+    marker.type = visualization_msgs::msg::Marker::SPHERE;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.pose.position.x = center.x();
+    marker.pose.position.y = center.y();
+    marker.pose.position.z = center.z();
+    marker.scale.x = radius * 2;
+    marker.scale.y = radius * 2;
+    marker.scale.z = radius * 2;
+    // Blue
+    marker.color.r = 0.0;
+    marker.color.g = 0.0;
+    marker.color.b = 1.0;
+    marker.color.a = alpha;
+    marker_array_.markers.push_back(marker);
+  }
   void update_scene(Eigen::Vector3d target, double radius) {
     // Sphere for VF Pose
     visualization_msgs::msg::Marker marker = base_marker_;
@@ -199,7 +217,6 @@ class Visualizer {
           constraint_planes,
       const Eigen::Vector3d& target, const Eigen::Vector3d& vf_pose,
       double radius) {
-
     // Sphere for VF Pose
     visualization_msgs::msg::Marker marker = base_marker_;
     marker.header.stamp = node_->now();
@@ -280,33 +297,64 @@ class Visualizer {
     }
     marker_pub_->publish(marker_array_);
     marker_array_.markers.clear();
-
   }
 
-  void publishCone(const Eigen::Vector3d& position,
-                   const Eigen::Vector3d& direction, int id) {
+  void draw_cone(const Eigen::Vector3d& position,
+                 const Eigen::Quaterniond& orientation, const double angle,
+                 const int id = 0,
+                 const std::vector<double> rgba = {1.0, 0.0, 0.0, 1.0}) {
     visualization_msgs::msg::Marker marker = base_marker_;
     marker.header.stamp = node_->now();
     marker.ns = "cone";
     marker.id = id;
-    marker.type = visualization_msgs::msg::Marker::CYLINDER;
-
+    marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.color.r = rgba[0];
+    marker.color.g = rgba[1];
+    marker.color.b = rgba[2];
+    marker.color.a = rgba[3];
     marker.pose.position.x = position.x();
     marker.pose.position.y = position.y();
     marker.pose.position.z = position.z();
-
-    Eigen::Quaterniond orientation = Eigen::Quaterniond::FromTwoVectors(
-        Eigen::Vector3d::UnitZ(), direction.normalized());
     marker.pose.orientation.x = orientation.x();
     marker.pose.orientation.y = orientation.y();
     marker.pose.orientation.z = orientation.z();
     marker.pose.orientation.w = orientation.w();
 
-    marker.scale.x = marker.scale.y = 0.02;
-    marker.scale.z = 0.1;
-    marker.color.r = 1.0;
-    marker.color.g = 0.5;
-    marker.color.b = 0.0;
+    static const int NUM_SEGMENTS = 32;  // more segments = smoother cone
+    const double height = 0.1;           // cone height
+    const double radius = height * std::tan(angle);  // base radius
+
+    // Create cone tip point
+    geometry_msgs::msg::Point tip;
+    tip.x = 0.0;
+    tip.y = 0.0;
+    tip.z = 0.0;  // tip at local (0,0,0)
+
+    double delta_theta = 2.0 * M_PI / NUM_SEGMENTS;
+
+    // Build triangles: from tip to base circle
+    for (int i = 0; i < NUM_SEGMENTS; ++i) {
+      double theta = i * delta_theta;
+      double next_theta = (i + 1) * delta_theta;
+
+      geometry_msgs::msg::Point p1, p2;
+
+      // First point on the base circle
+      p1.x = radius * std::cos(theta);
+      p1.y = radius * std::sin(theta);
+      p1.z = height;
+
+      // Next point on the base circle
+      p2.x = radius * std::cos(next_theta);
+      p2.y = radius * std::sin(next_theta);
+      p2.z = height;
+
+      // Triangle: tip, p1, p2
+      marker.points.push_back(tip);
+      marker.points.push_back(p1);
+      marker.points.push_back(p2);
+    }
 
     marker_array_.markers.push_back(marker);
   }
