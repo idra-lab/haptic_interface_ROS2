@@ -1,3 +1,5 @@
+#ifndef CIRCULAR_BUFFER_HPP
+#define CIRCULAR_BUFFER_HPP
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -103,3 +105,4 @@ class CircularBuffer {
     }
   }
 };
+#endif  // CIRCULAR_BUFFER_HPP

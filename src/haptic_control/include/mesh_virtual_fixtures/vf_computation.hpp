@@ -2,7 +2,7 @@
 #define VF_COMPUTATION_HPP
 #define DEBUG true
 #include "qp_wrapper.hpp"
-#include "visualization.hpp"
+#include "utils/visualization.hpp"
 
 namespace compute_vf {
 template <typename Scalar>
@@ -44,7 +44,9 @@ Eigen::Vector3d enforce_virtual_fixture(
     CP[Ti] = mesh.get_closest_on_triangle(current_position, Ti);
   }
   // vis.draw_closest_points(CP, 0.002);
+  // int iter = 0;
   for (auto it = T.begin(); it != T.end();) {
+    // std::cout << iter++ << std::endl;
     int Ti = *it;
     auto Ni = mesh.normals[*it];
     Ni.normalize();
@@ -88,11 +90,14 @@ Eigen::Vector3d enforce_virtual_fixture(
             neighborIdxList1 = mesh.adjacency_dict.at({Ti, Location::V1V3});
             neighborIdxList2 = mesh.adjacency_dict.at({Ti, Location::V2V3});
           } else {
-            std::cerr << "Invalid location: no adjacent triangles found"
-                      << std::endl;
-            exit(1);
+            it++;
+            continue;
           }
           bool keep = false;
+          if (neighborIdxList1.size() == 0 || neighborIdxList2.size() == 0) {
+            it++;
+            continue;
+          }
           int neighborIdx1 = neighborIdxList1[0];
           int neighborIdx2 = neighborIdxList2[0];
           // check if neighbor is already in the list otherwise add it
@@ -188,18 +193,24 @@ Eigen::Vector3d enforce_virtual_fixture(
 
   const int n_constraints = constraint_planes.size();
   // std::cout << "Found " << n_constraints << " constraints" << std::endl;
+  Eigen::Vector3d delta_x_des = target_position - current_position;
+  // if (n_constraints == 0) {
+  //   return delta_x_des;
+  // } else {
+  auto direction = target_position - current_position;
+  double step_size = std::min(direction.norm(), radius / 10);
+  // }
+  if (n_constraints == 0) {
+    return direction.normalized() * 0.00016;
+  }else{
+    delta_x_des = direction.normalized() * step_size;
+  }
 
   // QP
   // solves argmin x^T H x + g^T x
   //        s.t. A x >= A_lb
 
-  // hessian matrix
-  const Eigen::Matrix<real_t, 3, 3, Eigen::RowMajor> H =
-      Eigen::Matrix<real_t, 3, 3, Eigen::RowMajor>::Identity();
   // gradient vector
-  auto direction = target_position - current_position;
-  double step_size = std::min(direction.norm(), radius / 10);
-  Eigen::Vector3d delta_x_des = direction.normalized() * step_size;
   Eigen::Vector<real_t, 3> g = -delta_x_des;
   // constraint matrix
   Eigen::Vector<real_t, Eigen::Dynamic> A_lb(n_constraints);  //,lb(3),ub(3);
@@ -218,20 +229,19 @@ Eigen::Vector3d enforce_virtual_fixture(
   }
 
   // Assuming x is of dimension 3
-  const float max_delta = 0.0001;
+  const float max_delta = 0.00002;
+  // adding constraint on max delta to avoid oscillations between two points
   real_t x_lb[3] = {-max_delta, -max_delta, -max_delta};  // lower bound
   real_t x_ub[3] = {max_delta, max_delta, max_delta};     // upper bound
   qpOASES::Options myOptions;
   myOptions.printLevel = qpOASES::PL_LOW;
-  qpOASES::QProblem min_problem(3, n_constraints);
+  qpOASES::QProblem min_problem(3, n_constraints,
+                                qpOASES::HessianType::HST_IDENTITY);
   min_problem.setOptions(myOptions);
   Eigen::Vector<real_t, 3> delta_x;
   int nWSR = 200;
   if (n_constraints != 0) {
-    min_problem.init(H.data(), g.data(), A.data(), x_lb, x_ub, A_lb.data(), 0,
-                     nWSR);
-  } else {
-    min_problem.init(H.data(), g.data(), 0, x_lb, x_ub, 0, 0, nWSR);
+    min_problem.init(0, g.data(), A.data(), x_lb, x_ub, A_lb.data(), 0, nWSR);
   }
   // catch no solution
   if (min_problem.isInitialised() == false) {
@@ -243,7 +253,7 @@ Eigen::Vector3d enforce_virtual_fixture(
     std::cerr << "QP problem not solved" << std::endl;
     return Eigen::Vector3d::Zero();
   }
-  // // std::cout << "delta_x: " << delta_x << std::endl;
+  // std::cout << "delta_x: " << delta_x << std::endl;
 
   return delta_x.cast<double>();
 }

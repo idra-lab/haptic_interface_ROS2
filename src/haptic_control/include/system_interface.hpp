@@ -25,7 +25,7 @@ class SystemInterface : public rclcpp::Node {
  public:
   explicit SystemInterface(
       const Eigen::Quaterniond& q_haptic_base_to_robot_base,
-      const std::string& name = "system_interface",
+      const double force_scale, const std::string& name = "system_interface",
       const std::string& namespace_ = "",
       const rclcpp::NodeOptions& options =
           rclcpp::NodeOptions()
@@ -47,6 +47,7 @@ class SystemInterface : public rclcpp::Node {
     impedance_client_ =
         this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
             "virtuose_impedance");
+    scale_ = force_scale;
   }
   void create_connection() {
     auto cal = std::make_shared<
@@ -209,8 +210,8 @@ class SystemInterface : public rclcpp::Node {
  private:
   raptor_api_interfaces::msg::InVirtuoseForce old_force_;
   int client__id_ = 0;
-  const double alpha_ = 0.0;
-  const double scale_ = 0.3;
+  const double alpha_ = 0.6;
+  double scale_ = 0.3;
   const double max_force_ = 6.0;
   Eigen::Quaterniond q_haptic_base_to_robot_base_;
 

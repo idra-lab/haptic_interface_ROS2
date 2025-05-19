@@ -11,9 +11,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "closest_on_triangle.hpp"
-#include "json.hpp"
+#include "mesh_virtual_fixtures/closest_on_triangle.hpp"
 #include "open3d/Open3D.h"
+#include "utils/json.hpp"
 
 struct hash_tuple {
   template <class T1, class T2>

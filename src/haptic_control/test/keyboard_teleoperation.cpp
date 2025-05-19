@@ -10,12 +10,13 @@ Sample example of teleoperation using haptic device and force feedback
 @Author: Davide Nardi
 */
 KeyboardControl::KeyboardControl(const std::string &name,
-                                 const std::string &namespace_,
                                  const rclcpp::NodeOptions &options)
-    : Node(name, namespace_, options) {
+    : Node(name, options) {
   // safety sphere around robot base link to prevent singularity
   this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
   this->base_link_name_ = this->get_parameter("base_link_name").as_string();
+  this->tool_vis_radius_ = this->get_parameter("tool_vis_radius").as_double();
+  this->use_vf_ = this->get_parameter("use_fixtures").as_bool();
 
   target_pos_publisher_ =
       this->create_publisher<geometry_msgs::msg::PoseStamped>(
@@ -32,34 +33,75 @@ KeyboardControl::KeyboardControl(const std::string &name,
   // defines the rotation from the robot base frame to the haptic base frame
 
   x_new_ << 0.0, 0.0, 0.0;
-  x_old_ << 0.0, 0.0, 0.0;
+  thetas << 0.4, 0.4, 0.4;
   x_tilde_new_ << 0.0, 0.0, 0.0;
-  x_tilde_old_ << 0.0, 0.0, 0.0;
+  RCLCPP_INFO(this->get_logger(), "Starting Keyboard Control node with name %s",
+              name.c_str());
 }
 void KeyboardControl::init_vf_enforcer() {
   // Init virtual fixture enforcer
   vf_enforcer_ = std::make_shared<VFEnforcer>(
       this->shared_from_this(),
       Eigen::Vector3d(cur_pose_[0], cur_pose_[1], cur_pose_[2]),
-      this->base_link_name_);
+      this->base_link_name_, this->tool_vis_radius_, visualizer_);
 }
 
 void KeyboardControl::readInput() {
   key = getch();
-
-  if (moveBindings.count(key) == 1) {
+  euler_angles_ = q_new.toRotationMatrix().eulerAngles(0, 1, 2);
+  auto tmp = euler_angles_;
+  if (key != -1) {
     // Grab the direction data
-    cur_pose_[0] += motion_scale * moveBindings[key][0];
-    cur_pose_[1] += motion_scale * moveBindings[key][1];
-    cur_pose_[2] += motion_scale * moveBindings[key][2];
+    if (key == 'w')
+      cur_pose_[0] += motion_scale_l;
+    else if (key == 's')
+      cur_pose_[0] -= motion_scale_l;
+    else if (key == 'a')
+      cur_pose_[1] += motion_scale_l;
+    else if (key == 'd')
+      cur_pose_[1] -= motion_scale_l;
+    else if (key == 'q')
+      cur_pose_[2] += motion_scale_l;
+    else if (key == 'e')
+      cur_pose_[2] -= motion_scale_l;
+    else if (key == 'i')
+      euler_angles_[0] += motion_scale_a;
+    else if (key == 'k')
+      euler_angles_[0] -= motion_scale_a;
+    else if (key == 'j')
+      euler_angles_[1] += motion_scale_a;
+    else if (key == 'l')
+      euler_angles_[1] -= motion_scale_a;
+    else if (key == 'u')
+      euler_angles_[2] += motion_scale_a;
+    else if (key == 'o')
+      euler_angles_[2] -= motion_scale_a;
+    else {
+      RCLCPP_INFO(this->get_logger(), "Invalid key");
+    }
   }
+  RCLCPP_INFO(this->get_logger(),
+              "Current euler angles: roll: %f | pitch: %f | yaw: %f ||| Target "
+              "euler angles: roll: %f | pitch: %f | yaw: %f",
+              tmp[0], tmp[1], tmp[2], euler_angles_[0], euler_angles_[1],
+              euler_angles_[2]);
   x_new_ << cur_pose_[0], cur_pose_[1], cur_pose_[2];
-  x_old_ = x_new_;
-  auto delta_x = vf_enforcer_->enforce_vf(x_new_);
-  x_tilde_new_ += delta_x;
+  q_new = Eigen::Quaterniond(
+              Eigen::AngleAxisd(euler_angles_[0], Eigen::Vector3d::UnitX()) *
+              Eigen::AngleAxisd(euler_angles_[1], Eigen::Vector3d::UnitY()) *
+              Eigen::AngleAxisd(euler_angles_[2], Eigen::Vector3d::UnitZ()))
+              .normalized();
+  if (use_vf_) {
+    x_tilde_new_ = vf_enforcer_->enforce_vf(x_new_);
+    auto q_opt = conic_cbf::cbfOrientFilter(q_init, q_old, q_new, thetas);
+    q_old = q_opt;
+  } else {
+    x_tilde_new_ = x_new_;
+    q_old = q_new;
+  }
 }
 
-void KeyboardControl::startLoop() {
+void KeyboardControl::init_control() {
   received_ee_pose_ = false;
   while (!received_ee_pose_) {
     try {
@@ -84,8 +126,14 @@ void KeyboardControl::startLoop() {
       RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                             "End Effector pose not available: %s", ex.what());
     }
-    x_tilde_old_ = x_tilde_new_ = x_new_ = x_old_ =
+    x_tilde_new_ = x_new_ =
         Eigen::Vector3d(cur_pose_[0], cur_pose_[1], cur_pose_[2]);
+    q_new = q_old = q_init =
+        Eigen::Quaterniond(ee_starting_pose.pose.orientation.w,
+                           ee_starting_pose.pose.orientation.x,
+                           ee_starting_pose.pose.orientation.y,
+                           ee_starting_pose.pose.orientation.z)
+            .normalized();
   }
 
   RCLCPP_INFO(
@@ -98,12 +146,17 @@ void KeyboardControl::startLoop() {
       ee_starting_pose.pose.orientation.y, ee_starting_pose.pose.orientation.z,
       ee_starting_pose.pose.orientation.w);
 
-  init_vf_enforcer();
+  visualizer_ = std::make_shared<Visualizer>(this->shared_from_this(),
+                                             this->base_link_name_);
+  RCLCPP_INFO(this->get_logger(), "Visualizer initialized");
+  if (use_vf_) {
+    init_vf_enforcer();
+    RCLCPP_INFO(this->get_logger(), "VF enforcer initialized");
+  }
 
-  // Perform impedance loop at 1000 Hz
   controlThread_ = this->create_wall_timer(
       1ms, std::bind(&KeyboardControl::controlThread, this));
-  RCLCPP_INFO(this->get_logger(), "\033[0;32mImpedance thread started\033[0m");
+  RCLCPP_INFO(this->get_logger(), "Impedance thread started");
 }
 
 // This function is called at 1000 Hz
@@ -128,40 +181,21 @@ void KeyboardControl::controlThread() {
   target_pose_.pose.position.z = target_pose_tf_.transform.translation.z =
       ee_starting_pose.pose.position.z + error(2);
 
-  // eigen quat order is w x y z
-  Eigen::Quaterniond qStart(
-      ee_starting_pose.pose.orientation.w, ee_starting_pose.pose.orientation.x,
-      ee_starting_pose.pose.orientation.y, ee_starting_pose.pose.orientation.z);
-  Eigen::Quaterniond qCur(cur_pose_[6], cur_pose_[3], cur_pose_[4],
-                          cur_pose_[5]);
-  Eigen::Quaterniond qEEStart(
-      ee_starting_pose.pose.orientation.w, ee_starting_pose.pose.orientation.x,
-      ee_starting_pose.pose.orientation.y, ee_starting_pose.pose.orientation.z);
-
-  // RCLCPP_INFO(this->get_logger(),
-  //             "Current target position: x: %f | y: %f | z: %f",
-  //             target_pose_.pose.position.x, target_pose_.pose.position.y,
-  //             target_pose_.pose.position.z);
-  // computing the difference between the current orientation and the starting
-  // orientation of the haptic device
-  Eigen::Quaterniond qDiff = qCur * qStart.conjugate();
-  qDiff.normalize();
-
-  // applying delta rotation to the end effector starting orientation
-  Eigen::Quaterniond qTarget = qDiff * qEEStart;
-  qTarget.normalize();
-
   target_pose_.pose.orientation.x = target_pose_tf_.transform.rotation.x =
-      qTarget.x();
+      q_old.x();
   target_pose_.pose.orientation.y = target_pose_tf_.transform.rotation.y =
-      qTarget.y();
+      q_old.y();
   target_pose_.pose.orientation.z = target_pose_tf_.transform.rotation.z =
-      qTarget.z();
+      q_old.z();
   target_pose_.pose.orientation.w = target_pose_tf_.transform.rotation.w =
-      qTarget.w();
+      q_old.w();
 
   // send trasnform and publish target pose
   tf_broadcaster_->sendTransform(target_pose_tf_);
+  //   RCLCPP_INFO(this->get_logger(),
+  //               "Current target position: x: %f | y: %f | z: %f",
+  //               target_pose_.pose.position.x, target_pose_.pose.position.y,
+  //               target_pose_.pose.position.z);
   target_pos_publisher_->publish(target_pose_);
 }
 void KeyboardControl::projectTargetOnSphere(
@@ -174,12 +208,16 @@ int main(int argc, char **argv) {
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting Haptic Control node");
 
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<KeyboardControl>();
+  auto node = std::make_shared<KeyboardControl>("keyboard_control");
 
-  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Calling impedance service:");
+  rclcpp::executors::MultiThreadedExecutor executor;
+  executor.add_node(node);
 
-  node->startLoop();
-  rclcpp::spin(node);
+  // Start loop only after the node is properly added to the executor
+  node->init_control();
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Spinnig the node");
+  executor.spin();  // Ensure proper execution context
+
   rclcpp::shutdown();
   return 0;
 }
