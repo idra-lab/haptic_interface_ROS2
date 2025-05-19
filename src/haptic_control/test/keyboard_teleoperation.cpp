@@ -43,8 +43,7 @@ void KeyboardControl::init_vf_enforcer() {
   vf_enforcer_ = std::make_shared<VFEnforcer>(
       this->shared_from_this(),
       Eigen::Vector3d(cur_pose_[0], cur_pose_[1], cur_pose_[2]),
-      this->base_link_name_,
-      this->tool_vis_radius_);
+      this->base_link_name_, this->tool_vis_radius_, visualizer_);
 }
 
 void KeyboardControl::readInput() {
@@ -94,8 +93,7 @@ void KeyboardControl::readInput() {
               .normalized();
   if (use_vf_) {
     x_tilde_new_ = vf_enforcer_->enforce_vf(x_new_);
-    auto q_opt =
-        conic_cbf::cbfOrientFilter(q_init, q_old, q_new, thetas);
+    auto q_opt = conic_cbf::cbfOrientFilter(q_init, q_old, q_new, thetas);
     q_old = q_opt;
   } else {
     x_tilde_new_ = x_new_;
@@ -147,6 +145,10 @@ void KeyboardControl::init_control() {
       ee_starting_pose.pose.position.z, ee_starting_pose.pose.orientation.x,
       ee_starting_pose.pose.orientation.y, ee_starting_pose.pose.orientation.z,
       ee_starting_pose.pose.orientation.w);
+
+  visualizer_ = std::make_shared<Visualizer>(this->shared_from_this(),
+                                             this->base_link_name_);
+  RCLCPP_INFO(this->get_logger(), "Visualizer initialized");
   if (use_vf_) {
     init_vf_enforcer();
     RCLCPP_INFO(this->get_logger(), "VF enforcer initialized");

@@ -5,10 +5,10 @@ haptic_control:
     ft_link_name: "lbr_link_ee"
     ft_sensor_rate: 500.0
     target_frame_topic_name: "/lbr/target_frame"
-    base_frame_rotation: [0.0, 0.0, 1.0, 0.0] # quaternion in the form [x, y, z, w], it is used to align the robot base link with the haptic interface base link
+    base_frame_rotation: [0.0, 0.0, 0.0, 1.0] # quaternion in the form [x, y, z, w], it is used to align the robot base link with the haptic interface base link
     ft_feedback_topic_name: "/lbr/force_torque_broadcaster/wrench"
     # limit the robot's workspace
-    enable_safety_sphere: false
+    enable_safety_sphere: true
     safety_sphere_radius: 0.43
     safety_sphere_center: [0.03115595, 0.14413714, 0.11276928]
 

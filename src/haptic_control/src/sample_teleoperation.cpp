@@ -526,7 +526,7 @@ void HapticControl::impedanceThread() {
       qTarget.w();
 
   // send trasnform and publish target pose
-  tf_broadcaster_->sendTransform(target_pose_tf_);
+  // tf_broadcaster_->sendTransform(target_pose_tf_);
   target_pos_publisher_->publish(target_pose_);
 }
 void HapticControl::projectTargetOnSphere(Eigen::Vector3d &target_position_vec,

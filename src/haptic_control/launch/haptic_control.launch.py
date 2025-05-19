@@ -42,7 +42,7 @@ def launch_setup(context):
         print("\033[91m \n\nBag file already exists, creating another with suffix: ", datetime_str, "\033[0m")
         # exit(0)
     #     os.system("rm -r " + bag_path)
-    CMD = "ros2 bag record /current_frame /lbr/target_frame /desired_frame /lbr/force_torque_broadcaster/wrench /screen -o " + bag_path + " & "
+    CMD = "ros2 bag record /current_frame /lbr/target_frame /desired_frame /lbr/force_torque_broadcaster/wrench /lbr/state /us_image -o " + bag_path + " & "
 
     subprocess.Popen(CMD, shell=True)
 

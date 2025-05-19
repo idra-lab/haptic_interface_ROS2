@@ -135,6 +135,7 @@ Press Ctrl-C to quit.
   std::array<double, 3> bounding_box_center_;
   double tool_vis_radius_;
   std::shared_ptr<VFEnforcer> vf_enforcer_;
+  std::shared_ptr<Visualizer> visualizer_;
 
   // current haptic positions
   Eigen::Vector3d x_new_;

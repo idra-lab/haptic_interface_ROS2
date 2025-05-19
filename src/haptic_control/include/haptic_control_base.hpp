@@ -65,13 +65,6 @@ class HapticControlBase : public rclcpp::Node {
   void update_current_ee_pos();
   void get_ee_trans(geometry_msgs::msg::TransformStamped &trans);
 
-  // Virtual fixture callbacks
-  void enable_safety_sphere_CB(const rclcpp::Parameter &p);
-  void set_safety_sphere_radius_CB(const rclcpp::Parameter &p);
-  void enable_safety_box_CB(const rclcpp::Parameter &p);
-  void set_safety_box_width_CB(const rclcpp::Parameter &p);
-  void set_safety_box_length_CB(const rclcpp::Parameter &p);
-  void set_safety_box_height_CB(const rclcpp::Parameter &p);
   // Utility functions
   void store_wrench(const geometry_msgs::msg::WrenchStamped &target_wrench);
   Eigen::Vector3d compute_position_error();
@@ -114,15 +107,6 @@ class HapticControlBase : public rclcpp::Node {
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
-  // Parameter callbacks
-  std::shared_ptr<rclcpp::ParameterEventHandler> param_subscriber_;
-  std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_enable_safety_sphere_;
-  std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_safety_sphere_radius_;
-  std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_enable_safety_box_;
-  std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_safety_box_width_;
-  std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_safety_box_length_;
-  std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_safety_box_height_;
-
   // Pose and wrench data
   geometry_msgs::msg::WrenchStamped current_wrench_;
   geometry_msgs::msg::PoseStamped old_pose_, ee_starting_position,
@@ -139,7 +123,6 @@ class HapticControlBase : public rclcpp::Node {
 
   // Device status and bounding box
   std::array<double, 7> cur_pose_;
-  std::array<double, 3> bounding_box_center_;
   uint32_t status_state_;
   uint32_t status_button_;
 
@@ -151,18 +134,16 @@ class HapticControlBase : public rclcpp::Node {
   std::string ft_feedback_topic_name_;
   double safety_sphere_radius_;
   Eigen::Vector3d safety_sphere_center_;
-  double safety_box_width_, safety_box_length_, safety_box_height_;
   double max_force_;
   double force_scale_;
   double delay_;
   int delay_loop_haptic_, delay_loop_ft_;
   double haptic_control_rate_, ft_sensor_rate_;
   double tool_vis_radius_;
-  bool enable_safety_sphere_ = false;
-  bool enable_safety_box_ = false;
   bool received_haptic_pose_ = false;
   bool received_ee_pose_ = false;
   bool first_control_loop_ = true;
+  bool enable_safety_sphere_ = false;
 
   // Time tracking
   rclcpp::Time last_robot_pose_update_time_;

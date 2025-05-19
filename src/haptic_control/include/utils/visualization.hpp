@@ -6,6 +6,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <unordered_map>
 #include <vector>
+#include "colors.hpp"
 #include "mesh_virtual_fixtures/location.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 
@@ -15,23 +16,18 @@ class Visualizer {
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
       marker_pub_;
   std::string reference_frame_;
-  double plane_size_;
   visualization_msgs::msg::Marker base_marker_;
   visualization_msgs::msg::MarkerArray marker_array_;
 
   Visualizer(std::shared_ptr<rclcpp::Node> node,
-             const std::string& reference_frame, double plane_size = 0.1)
-      : node_(node),
-        reference_frame_(reference_frame),
-        plane_size_(plane_size) {
+             const std::string& reference_frame)
+      : node_(node), reference_frame_(reference_frame) {
     init_publisher();
-    InitBaseMarker(reference_frame_, node_->get_clock());
+    init_base_marker(reference_frame_);
   }
 
-  void InitBaseMarker(const std::string& frame_id,
-                      rclcpp::Clock::SharedPtr clock) {
+  void init_base_marker(const std::string& frame_id) {
     base_marker_.header.frame_id = frame_id;
-    base_marker_.header.stamp = clock->now();
     base_marker_.type = visualization_msgs::msg::Marker::MESH_RESOURCE;
     base_marker_.action = visualization_msgs::msg::Marker::ADD;
     base_marker_.pose.orientation.w = 1.0;
@@ -73,7 +69,7 @@ class Visualizer {
     skin_marker.ns = "patient";
     skin_marker.id = 0;
     skin_marker.mesh_resource = "file://" + skin_mesh_path;
-    skin_marker.color.a = 0.8;
+    skin_marker.color.a = 0.6;
 
     visualization_msgs::msg::Marker vf_marker = skin_marker;
     vf_marker.id = 1;
@@ -216,7 +212,7 @@ class Visualizer {
       const std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>&
           constraint_planes,
       const Eigen::Vector3d& target, const Eigen::Vector3d& vf_pose,
-      double radius) {
+      double radius, double plane_size) {
     // Sphere for VF Pose
     visualization_msgs::msg::Marker marker = base_marker_;
     marker.header.stamp = node_->now();
@@ -278,8 +274,8 @@ class Visualizer {
       marker.id = static_cast<int>(i);
       marker.type = visualization_msgs::msg::Marker::CUBE;
       marker.action = visualization_msgs::msg::Marker::ADD;
-      marker.scale.x = plane_size_;
-      marker.scale.y = plane_size_;
+      marker.scale.x = plane_size;
+      marker.scale.y = plane_size;
       marker.scale.z = 0.0001;
       marker.color.r = 1.0;
       marker.color.g = 1.0;
@@ -312,7 +308,7 @@ class Visualizer {
     marker.color.r = rgba[0];
     marker.color.g = rgba[1];
     marker.color.b = rgba[2];
-    marker.color.a = rgba[3];
+    marker.color.a = 0.2;  // rgba[3];
     marker.pose.position.x = position.x();
     marker.pose.position.y = position.y();
     marker.pose.position.z = position.z();
