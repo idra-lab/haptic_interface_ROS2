@@ -4,13 +4,16 @@ haptic_control:
     ff_device_ip_address: "192.168.100.53"
     ff_device_param_file: "/etc/Haption/Connector/desktop_6D_n65.param"
     local_ip_address: "192.168.100.50"
+    force_max: 6.0 # Newton
+    force_scale: 0.4
+    smooth_factor: 0.5 # smoothing factor for the force feedback, acts as a low pass filter, 0 is no smoothing, 1 is no update
+
+    # Control parameters
     haptic_control_rate: 1000.0 # Hz
-    max_force: 6.0 # Newton
     simulated_delay: 0.0 # round trip simulated delay in seconds (0.0 for no delay)
     tool_vis_radius: 0.005 # radius of the end effector sphere for visualization in Rviz
-    force_scale: 0.4
 
-    # virtual fixture parameters to constrain the end effector over a mesh
+    # Virtual Fixture parameters to constrain the end effector over a mesh
     vf_parameters:
       mesh_type: "file" # knot, sphere, file, bunny
       # input_mesh_path: "/home/nardi/temp/vf/virtual_fixtures.obj" # path to the input mesh if mesh_type is file
@@ -21,12 +24,12 @@ haptic_control:
       lookup_area: 0.004 # area around the end effector to look for the closest point on the mesh
       plane_size: 0.002 # plane size used to visualize active constraints in rviz
 
-    # conic control barrier function parameters to constraint the robot orientation inside a cone
+      # Conic Control Barrier Function parameters to constraint the robot orientation inside a cone
       use_ccbf: true
       ccbf_params:
         use_initial_conf_as_q_ref: true # if true, the initial end effector orientation is used as the reference orientation
         ccbf_q_ref: [0.21006, 0.97703, 0.018034, 0.031066] # quaternion in the form [x, y, z, w] for the reference orientation of the end effector, considered only if use_initial_conf_as_q_ref is false
-        ccbf_thetas: [0.4 , 0.4, 0.4] # angle in radians for each axis of R_ref (which is q_ref as a rotation matrix)
+        ccbf_thetas: [0.4, 0.4, 0.4] # angle in radians for each axis of R_ref (which is q_ref as a rotation matrix)
         # ccbf_thetas: [0.3 , 0.3, 0.3]
 
 keyboard_control:

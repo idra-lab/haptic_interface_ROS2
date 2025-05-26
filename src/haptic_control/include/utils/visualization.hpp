@@ -75,8 +75,8 @@ class Visualizer {
     vf_marker.id = 1;
     vf_marker.mesh_resource = "file://" + output_mesh_path;
     vf_marker.color.r = 1.0;
-    vf_marker.color.g = 0.0;
-    vf_marker.color.b = 0.0;
+    vf_marker.color.g = 0.627;
+    vf_marker.color.b = 0.478;
     vf_marker.color.a = 1.0;
 
     marker_array_.markers = {skin_marker, vf_marker};
@@ -308,7 +308,7 @@ class Visualizer {
     marker.color.r = rgba[0];
     marker.color.g = rgba[1];
     marker.color.b = rgba[2];
-    marker.color.a = 0.2;  // rgba[3];
+    marker.color.a = 0.3;  // rgba[3];
     marker.pose.position.x = position.x();
     marker.pose.position.y = position.y();
     marker.pose.position.z = position.z();

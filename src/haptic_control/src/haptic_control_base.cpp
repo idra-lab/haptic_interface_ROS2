@@ -19,8 +19,6 @@ HapticControlBase::HapticControlBase(const std::string &name,
   // Main parameters
   this->get_parameter("ft_feedback_topic_name", ft_feedback_topic_name_);
   this->get_parameter("target_frame_topic_name", target_frame_topic_name_);
-  this->get_parameter("max_force", max_force_);
-  this->force_scale_ = this->get_parameter("force_scale").as_double();
   this->tool_link_name_ = this->get_parameter("tool_link_name").as_string();
   this->base_link_name_ = this->get_parameter("base_link_name").as_string();
   this->ft_link_name_ = this->get_parameter("ft_link_name").as_string();
@@ -134,22 +132,18 @@ HapticControlBase::HapticControlBase(const std::string &name,
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-  // defines the rotation from the robot base frame to the haptic base frame
-  std::vector<double> base_frame_rot;
-  this->get_parameter("base_frame_rotation", base_frame_rot);
-  Eigen::Quaterniond q_haptic_base_to_robot_base_(
-      base_frame_rot[3], base_frame_rot[0], base_frame_rot[1],
-      base_frame_rot[2]);
-
-  // Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitZ()));
-  RCLCPP_INFO(
-      this->get_logger(),
-      "Haptic base to robot base rotation: x: %f | y: %f | z: %f | w: "
-      "%f",
-      q_haptic_base_to_robot_base_.x(), q_haptic_base_to_robot_base_.y(),
-      q_haptic_base_to_robot_base_.z(), q_haptic_base_to_robot_base_.w());
+  // Create the haptic device object that manges the hardware
+  RCLCPP_INFO(this->get_logger(), "\033[0;32mCreating Haptic Device\033[0m");
   haptic_device_ = std::make_shared<SystemInterface>(
-      q_haptic_base_to_robot_base_, force_scale_);
+      this->get_parameter("channel").as_string(),
+      this->get_parameter("local_ip_address").as_string(),
+      this->get_parameter("ff_device_ip_address").as_string(),
+      this->get_parameter("ff_device_param_file").as_string(),
+      this->get_parameter("base_frame_rotation").as_double_array(),
+      this->get_parameter("force_scale").as_double(),
+      this->get_parameter("force_max").as_double(),
+      this->get_parameter("smooth_factor").as_double());
+
   last_robot_pose_update_time_ = this->get_clock()->now();
   // new haptic pose
   x_new_ << 0.0, 0.0, 0.0;
@@ -348,7 +342,7 @@ void HapticControlBase::control_thread() {
     RCLCPP_ERROR(
         this->get_logger(),
         "Robot pose not updated within the last 3 seconds, shutting down");
-    rclcpp::shutdown();
+    // rclcpp::shutdown();
   }
   first_control_loop_ = false;
   // Update haptic device pose with safety sphere check
@@ -448,7 +442,7 @@ void HapticControlBase::control_thread() {
     //*
 
     auto q_opt = vf_enforcer_->enforce_orientation_constraints(
-        target_orientation, q_old_, q_ref_, thetas_);
+        target_orientation, q_old_, thetas_);
     q_old_ = q_opt;
 
     target_pose_vf_.pose.orientation = eigenToRosQuat(q_opt);

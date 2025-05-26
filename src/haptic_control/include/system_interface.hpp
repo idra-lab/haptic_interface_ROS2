@@ -24,15 +24,18 @@ using namespace std::chrono_literals;
 class SystemInterface : public rclcpp::Node {
  public:
   explicit SystemInterface(
-      const Eigen::Quaterniond& q_haptic_base_to_robot_base,
-      const double force_scale, const std::string& name = "system_interface",
+      const std::string channel, const std::string local_ip_address,
+      const std::string device_ip_address, const std::string device_param_file,
+      const std::vector<double> q_haptic_base_to_robot_base,
+      const double force_scale = 1.0, const double force_max = 6.0,
+      const double smooth_factor = 0.5,
+      const std::string& name = "system_interface",
       const std::string& namespace_ = "",
       const rclcpp::NodeOptions& options =
           rclcpp::NodeOptions()
               .allow_undeclared_parameters(true)
               .automatically_declare_parameters_from_overrides(true))
-      : Node(name, namespace_, options),
-        q_haptic_base_to_robot_base_(q_haptic_base_to_robot_base) {
+      : Node(name, namespace_, options) {
     pose_subscriber_ =
         this->create_subscription<raptor_api_interfaces::msg::OutVirtuosePose>(
             "out_virtuose_pose", 1,
@@ -47,27 +50,33 @@ class SystemInterface : public rclcpp::Node {
     impedance_client_ =
         this->create_client<raptor_api_interfaces::srv::VirtuoseImpedance>(
             "virtuose_impedance");
-    scale_ = force_scale;
+    channel_ = channel;
+    local_ip_address_ = local_ip_address;
+    device_ip_address_ = device_ip_address;
+    device_param_file_ = device_param_file;
+    q_haptic_base_to_robot_base_ = q_haptic_base_to_robot_base;
+    f_scale_ = force_scale;
+    f_max_ = force_max;
+    alpha_ = smooth_factor;
   }
   void create_connection() {
     auto cal = std::make_shared<
         raptor_api_interfaces::srv::VirtuoseCalibrate::Request>();
     auto imp = std::make_shared<
         raptor_api_interfaces::srv::VirtuoseImpedance::Request>();
-    imp->channel = cal->channel = "SimpleChannelUDP";
-    imp->ff_device_ip_address = cal->ff_device_ip_address = "192.168.100.53";
-    imp->ff_device_param_file = cal->ff_device_param_file =
-        "/etc/Haption/Connector/desktop_6D_n65.param";
-    imp->local_ip_address = cal->local_ip_address = "192.168.100.50";
+    imp->channel = cal->channel = channel_;
+    imp->ff_device_ip_address = cal->ff_device_ip_address = device_ip_address_;
+    imp->local_ip_address = cal->local_ip_address = local_ip_address_;
+    imp->ff_device_param_file = cal->ff_device_param_file = device_param_file_;
 
     imp->base_frame.translation.x = 0.0;
     imp->base_frame.translation.y = 0.0;
     imp->base_frame.translation.z = 0.0;
 
-    imp->base_frame.rotation.x = q_haptic_base_to_robot_base_.x();
-    imp->base_frame.rotation.y = q_haptic_base_to_robot_base_.y();
-    imp->base_frame.rotation.z = q_haptic_base_to_robot_base_.z();
-    imp->base_frame.rotation.w = q_haptic_base_to_robot_base_.w();
+    imp->base_frame.rotation.x = q_haptic_base_to_robot_base_[0];
+    imp->base_frame.rotation.y = q_haptic_base_to_robot_base_[1];
+    imp->base_frame.rotation.z = q_haptic_base_to_robot_base_[2];
+    imp->base_frame.rotation.w = q_haptic_base_to_robot_base_[3];
 
     while (!calibration_client_->wait_for_service(
         std::literals::chrono_literals::operator""s(1))) {
@@ -152,14 +161,14 @@ class SystemInterface : public rclcpp::Node {
     force_.client_id = client__id_;
     // filter noise
     force_.virtuose_force.force.x =
-        scale_ * filter_force(alpha_, target_wrench_.wrench.force.x,
-                              old_force_.virtuose_force.force.x);
+        f_scale_ * filter_force(alpha_, target_wrench_.wrench.force.x,
+                                old_force_.virtuose_force.force.x);
     force_.virtuose_force.force.y =
-        scale_ * filter_force(alpha_, target_wrench_.wrench.force.y,
-                              old_force_.virtuose_force.force.y);
+        f_scale_ * filter_force(alpha_, target_wrench_.wrench.force.y,
+                                old_force_.virtuose_force.force.y);
     force_.virtuose_force.force.z =
-        scale_ * filter_force(alpha_, target_wrench_.wrench.force.z,
-                              old_force_.virtuose_force.force.z);
+        f_scale_ * filter_force(alpha_, target_wrench_.wrench.force.z,
+                                old_force_.virtuose_force.force.z);
 
     // torque omitted for control simplicity
     force_.virtuose_force.torque.x = 0.0;
@@ -168,11 +177,11 @@ class SystemInterface : public rclcpp::Node {
 
     // SAFE ZONE FORCE
     force_.virtuose_force.force.x =
-        std::clamp(force_.virtuose_force.force.x, -max_force_, max_force_);
+        std::clamp(force_.virtuose_force.force.x, -f_max_, f_max_);
     force_.virtuose_force.force.y =
-        std::clamp(force_.virtuose_force.force.y, -max_force_, max_force_);
+        std::clamp(force_.virtuose_force.force.y, -f_max_, f_max_);
     force_.virtuose_force.force.z =
-        std::clamp(force_.virtuose_force.force.z, -max_force_, max_force_);
+        std::clamp(force_.virtuose_force.force.z, -f_max_, f_max_);
 
     // updating old force
     old_force_ = force_;
@@ -210,10 +219,10 @@ class SystemInterface : public rclcpp::Node {
  private:
   raptor_api_interfaces::msg::InVirtuoseForce old_force_;
   int client__id_ = 0;
-  const double alpha_ = 0.6;
-  double scale_ = 0.3;
-  const double max_force_ = 6.0;
-  Eigen::Quaterniond q_haptic_base_to_robot_base_;
+  double f_scale_, f_max_, alpha_;
+  std::string channel_, local_ip_address_, device_ip_address_,
+      device_param_file_;
+  std::vector<double> q_haptic_base_to_robot_base_;
 
   rclcpp::Publisher<raptor_api_interfaces::msg::InVirtuoseForce>::SharedPtr
       wrench_publisher_;

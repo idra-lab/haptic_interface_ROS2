@@ -134,8 +134,6 @@ class HapticControlBase : public rclcpp::Node {
   std::string ft_feedback_topic_name_;
   double safety_sphere_radius_;
   Eigen::Vector3d safety_sphere_center_;
-  double max_force_;
-  double force_scale_;
   double delay_;
   int delay_loop_haptic_, delay_loop_ft_;
   double haptic_control_rate_, ft_sensor_rate_;

@@ -13,7 +13,8 @@
 class VFEnforcer {
  public:
   VFEnforcer(std::shared_ptr<rclcpp::Node> node, Eigen::Vector3d x_des,
-             std::string base_link_name, double tool_vis_radius, std::shared_ptr<Visualizer> visualizer) {
+             std::string base_link_name, double tool_vis_radius,
+             std::shared_ptr<Visualizer> visualizer) {
     node_ = node;
 
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
@@ -79,7 +80,7 @@ class VFEnforcer {
                                                  << skin_mesh_transform_
                                                  << "\n");
       skin_kdtree_.SetGeometry(skin_pcd);
-      ribs_lateral_extension_ = -skin_mesh_transform_.block<3, 1>(0, 2);
+      ribs_lateral_extension_ = skin_mesh_transform_.block<3, 1>(0, 2);
       visualizer_->add_patient_mesh(output_mesh_path_, skin_mesh_path_);
     } else {
       visualizer_->add_mesh(output_mesh_path_, 0);
@@ -148,15 +149,15 @@ class VFEnforcer {
     return centroids;
   }
 
-  Eigen::Quaterniond computeQRef(Eigen::Quaterniond default_qref,
-                                 int num_faces) {
+  bool computeQRef(Eigen::Quaterniond& q_ref, int num_faces) {
     // Compute the normals of the nearest x triangles to x_new with KdTree
     std::vector<int> indices;
     std::vector<double> distances;
-    const double lookup_area_ = 0.3;
+    const double lookup_area_ = 0.6;
     skin_kdtree_.SearchRadius(x_old_, lookup_area_, indices, distances);
     if ((int)indices.size() < num_faces) {
-      return default_qref;
+      // not enough faces found
+      return false;
     }
     Eigen::Vector3d n_avg = Eigen::Vector3d::Zero();
 
@@ -183,8 +184,8 @@ class VFEnforcer {
     rotmat.col(1) = y_axis;
     rotmat.col(2) = z_axis;
 
-    Eigen::Quaterniond q_ref(rotmat);
-    return q_ref;
+    q_ref = Eigen::Quaterniond(rotmat);
+    return true;
   }
   Eigen::Vector3d projectOntoPlane(const Eigen::Vector3d& v,
                                    const Eigen::Vector3d& plane_normal) {
@@ -193,27 +194,32 @@ class VFEnforcer {
   }
   Eigen::Quaterniond enforce_orientation_constraints(
       Eigen::Quaterniond& target_orientation, Eigen::Quaterniond& q_old,
-      Eigen::Quaterniond& q_ref, Eigen::Vector3d& thetas) {
+      Eigen::Vector3d& thetas) {
     if (first_time_) {
-      q_ref_old_ = q_ref;
+      q_ref_old_ = target_orientation; //q_ref;
       first_time_ = false;
     }
-    Eigen::Quaterniond q_ref_new = computeQRef(q_ref, 30);
-    // Slerp towards the new q_ref
-    q_ref_new = q_ref_old_.slerp(0.1, q_ref_new);
-    bool draw_cones = true;
-    if(draw_cones){
-    auto axis = utils::get_quaternions_from_rotmat_axis(q_ref_new);
-    visualizer_->draw_cone(x_old_, axis[0], thetas(0), 0,
-                           utils::colors::COLOR_RED);
-    visualizer_->draw_cone(x_old_, axis[1], thetas(1), 1,
-                           utils::colors::COLOR_GREEN);
-    visualizer_->draw_cone(x_old_, axis[2], thetas(2), 2,
-                           utils::colors::COLOR_BLUE);
+    Eigen::Quaterniond q_ref;
+    bool succes = computeQRef(q_ref, 30);
+    if (!succes) {
+      // not enough faces found, do not filter
+      return target_orientation;
     }
-    q_ref_old_ = q_ref_new;
-    q_opt_ = conic_cbf::cbfOrientFilter(q_ref_new, q_old, target_orientation,
-                                        thetas);
+    // Slerp towards the new q_ref
+    q_ref = q_ref_old_.slerp(0.1, q_ref);
+    bool draw_cones = true;
+    if (draw_cones) {
+      auto axis = utils::get_quaternions_from_rotmat_axis(q_ref);
+      visualizer_->draw_cone(x_old_, axis[0], thetas(0), 0,
+                             utils::colors::COLOR_RED);
+      visualizer_->draw_cone(x_old_, axis[1], thetas(1), 1,
+                             utils::colors::COLOR_GREEN);
+      visualizer_->draw_cone(x_old_, axis[2], thetas(2), 2,
+                             utils::colors::COLOR_BLUE);
+    }
+    q_ref_old_ = q_ref;
+    q_opt_ =
+        conic_cbf::cbfOrientFilter(q_ref, q_old, target_orientation, thetas);
     return q_opt_;
   }
 
