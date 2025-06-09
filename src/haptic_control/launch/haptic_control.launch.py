@@ -24,6 +24,7 @@ launch_args = [
     DeclareLaunchArgument("skin_mesh_path", default_value=DEFAULT_SKIN_MESH_PATH, description="Use this argument to select the file to the patient skin mesh"),
     DeclareLaunchArgument("skin_params_path", default_value=DEFAULT_SKIN_PARAMS_PATH, description="Use this argument to select the file to the skin parameters"),
     DeclareLaunchArgument("robot_type", default_value="kuka", description="Use this argument to select the robot type (ur3e, kuka)"),
+    DeclareLaunchArgument("record", default_value="true", description="Use this argument to activate the bag recording (true or false)"),
 ]
 
 def launch_setup(context):
@@ -31,23 +32,25 @@ def launch_setup(context):
     haptic_params = get_package_share_directory("haptic_control") + "/config/haptic_parameters.yaml"
     robot_params = get_package_share_directory("haptic_control") + "/config/" + LaunchConfiguration('robot_type').perform(context) + "_parameters.yaml"
     use_fixtures = True if LaunchConfiguration("use_fixtures").perform(context) == "true" else False
-
+    record = True if LaunchConfiguration("record").perform(context) == "true" else False
     bag_path = LaunchConfiguration("bag_path").perform(context)
-    # remove folder if exists
-    os.system("rm -r " + "adjacency_dict*.txt")
-    if os.path.exists(bag_path):
-        datetime_now = datetime.datetime.now()
-        datetime_str = datetime_now.strftime("%Y-%m-%d_%H-%M-%S")
-        bag_path = bag_path[:-1] + "_" + datetime_str
-        print("\033[91m \n\nBag file already exists, creating another with suffix: ", datetime_str, "\033[0m")
-        # exit(0)
-    #     os.system("rm -r " + bag_path)
-    CMD = "ros2 bag record /current_frame /lbr/target_frame /desired_frame /lbr/force_torque_broadcaster/wrench /lbr/state /us_image/compressed -o " + bag_path + " & "
+    print("\033[92m \n\nRecord bag: ", record, "\033[0m")
+    if record:
+        # remove folder if exists
+        os.system("rm -r " + "adjacency_dict*.txt")
+        if os.path.exists(bag_path):
+            datetime_now = datetime.datetime.now()
+            datetime_str = datetime_now.strftime("%Y-%m-%d_%H-%M-%S")
+            bag_path = bag_path[:-1] + "_" + datetime_str
+            print("\033[91m \n\nBag file already exists, creating another with suffix: ", datetime_str, "\033[0m")
+            # exit(0)
+        #     os.system("rm -r " + bag_path)
+        CMD = "ros2 bag record /current_frame /lbr/target_frame /desired_frame /lbr/force_torque_broadcaster/wrench /lbr/state /us_image/compressed -o " + bag_path + " & "
 
-    subprocess.Popen(CMD, shell=True)
+        subprocess.Popen(CMD, shell=True)
+        print("\033[92m Recording bag in: ", bag_path, "\033[0m")
 
     print("\033[92m \n\nuse_fixtures: ", use_fixtures, "\033[0m")
-    print("\033[92m Recording bag in: ", bag_path, "\033[0m")
     input_mesh_path = LaunchConfiguration("input_mesh_path").perform(context)
     skin_mesh_path = LaunchConfiguration("skin_mesh_path").perform(context)
     params_path = LaunchConfiguration("skin_params_path").perform(context)

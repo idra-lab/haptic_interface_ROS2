@@ -24,8 +24,7 @@ Eigen::Vector3d enforce_virtual_fixture(
     Mesh &mesh, const Eigen::Vector3d &target_position,
     const Eigen::Vector3d &current_position, const double radius,
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> &constraint_planes,
-    double lookup_area, Visualizer &vis) {
-  (void)vis;
+    double lookup_area) {
   // Find nearby triangles within a specified distance
   const double max_distance = radius + lookup_area;
   std::vector<int> T;

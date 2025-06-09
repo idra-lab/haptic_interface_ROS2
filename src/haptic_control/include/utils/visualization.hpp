@@ -69,7 +69,7 @@ class Visualizer {
     skin_marker.ns = "patient";
     skin_marker.id = 0;
     skin_marker.mesh_resource = "file://" + skin_mesh_path;
-    skin_marker.color.a = 0.6;
+    skin_marker.color.a = 0.4;
 
     visualization_msgs::msg::Marker vf_marker = skin_marker;
     vf_marker.id = 1;
@@ -77,7 +77,7 @@ class Visualizer {
     vf_marker.color.r = 1.0;
     vf_marker.color.g = 0.627;
     vf_marker.color.b = 0.478;
-    vf_marker.color.a = 1.0;
+    vf_marker.color.a = 0.6;
 
     marker_array_.markers = {skin_marker, vf_marker};
     publish_multiple(marker_array_);

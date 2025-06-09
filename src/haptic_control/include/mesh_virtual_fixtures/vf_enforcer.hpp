@@ -76,22 +76,22 @@ class VFEnforcer {
       // create point cloud from centroids
       skin_pcd.points_ = centroids;
       skin_mesh_transform_ = utils::read_transform_from_file(skin_params_path_);
-      RCLCPP_INFO_STREAM(node->get_logger(), "Skin mesh transform matrix: \n"
-                                                 << skin_mesh_transform_
-                                                 << "\n");
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Skin mesh transform matrix: \n"
+                                                  << skin_mesh_transform_
+                                                  << "\n");
       skin_kdtree_.SetGeometry(skin_pcd);
       ribs_lateral_extension_ = skin_mesh_transform_.block<3, 1>(0, 2);
       visualizer_->add_patient_mesh(output_mesh_path_, skin_mesh_path_);
     } else {
       visualizer_->add_mesh(output_mesh_path_, 0);
     }
-    RCLCPP_INFO_STREAM(node->get_logger(),
+    RCLCPP_INFO_STREAM(node_->get_logger(),
                        "Loaded mesh with "
                            << o3d_mesh->vertices_.size() << " vertices and "
                            << o3d_mesh->triangles_.size() << " triangles.");
     // Ensure the mesh has vertices
     if (o3d_mesh->vertices_.empty()) {
-      RCLCPP_ERROR_STREAM(node->get_logger(),
+      RCLCPP_ERROR_STREAM(node_->get_logger(),
                           "Mesh has no vertices, shutting down");
       rclcpp::shutdown();
     }
@@ -110,18 +110,34 @@ class VFEnforcer {
     x_old_ << x_des[0], x_des[1], x_des[2];
     delta_x_ << 0.0, 0.0, 0.0;
 
-    RCLCPP_INFO_STREAM(node->get_logger(), "Computing mesh properties...");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Computing mesh properties...");
     mesh_ = std::make_shared<Mesh>(o3d_mesh->vertices_, o3d_mesh->triangles_,
                                    o3d_mesh->triangle_normals_);
     visualizer_->update_scene(constraint_planes_, x_des, x_old_,
                               tool_vis_radius_, plane_size_);
   }
 
-  Eigen::Vector3d enforce_vf(Eigen::Vector3d x_des) {
+  Eigen::Vector3d enforce_vf(const Eigen::Vector3d& x_des) {
     delta_x_ = compute_vf::enforce_virtual_fixture(
-        *mesh_, x_des, x_old_, tool_radius_, constraint_planes_, lookup_area_,
-        *visualizer_);
-    // integrate
+        *mesh_, x_des, x_old_, tool_radius_, constraint_planes_, lookup_area_);
+    // slow down reference when close to the subject body
+    bool slow_down_when_close_to_body_ = true;
+    if (slow_down_when_close_to_body_) {
+      std::vector<int> indices;
+      std::vector<double> distances;
+      const double lookup_area_ = 0.05;
+      skin_kdtree_.SearchRadius(x_old_, lookup_area_, indices, distances);
+      if ((int)indices.size() > 0) {
+        // Scale down the delta_x vector to reduce the speed
+        // when the probe is close to the body
+        double step_size = std::min(delta_x_.norm(), 0.00002);
+        delta_x_ = step_size * delta_x_.normalized();
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+                             "Slow down reference when close to body: %f",
+                             delta_x_.norm());
+      }
+    }
+    // integrate the dynamical system
     auto x_new = x_old_ + delta_x_;
     x_old_ = x_new;
     geometry_msgs::msg::PoseStamped target_pose_vf;
@@ -137,7 +153,7 @@ class VFEnforcer {
   }
 
   std::vector<Eigen::Vector3d> getCentroids(
-      open3d::geometry::TriangleMesh& mesh) {
+      const open3d::geometry::TriangleMesh& mesh) {
     std::vector<Eigen::Vector3d> centroids;
     Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
     for (const auto& triangle : mesh.triangles_) {
@@ -196,7 +212,7 @@ class VFEnforcer {
       Eigen::Quaterniond& target_orientation, Eigen::Quaterniond& q_old,
       Eigen::Vector3d& thetas) {
     if (first_time_) {
-      q_ref_old_ = target_orientation; //q_ref;
+      q_ref_old_ = target_orientation;  // q_ref;
       first_time_ = false;
     }
     Eigen::Quaterniond q_ref;

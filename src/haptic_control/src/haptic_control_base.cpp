@@ -310,8 +310,8 @@ void HapticControlBase::initialize_haptic_control() {
 Eigen::Vector3d HapticControlBase::compute_position_error() {
   Eigen::Vector3d haptic_starting_position =
       eigenFromRosPoint(haptic_device_->haptic_starting_pose_.pose.position);
-
-  return x_tilde_new_ - haptic_starting_position;
+  Eigen::Vector3d delta_x = x_tilde_new_ - haptic_starting_position;
+  return delta_x;
 }
 
 Eigen::Quaterniond HapticControlBase::compute_orientation_error() {

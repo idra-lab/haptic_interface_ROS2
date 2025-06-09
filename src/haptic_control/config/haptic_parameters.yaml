@@ -6,7 +6,7 @@ haptic_control:
     local_ip_address: "192.168.100.50"
     force_max: 6.0 # Newton
     force_scale: 0.4
-    smooth_factor: 0.5 # smoothing factor for the force feedback, acts as a low pass filter, 0 is no smoothing, 1 is no update
+    smooth_factor: 0.55 # smoothing factor for the force feedback, acts as a low pass filter, 0 is no smoothing, 1 is no update
 
     # Control parameters
     haptic_control_rate: 1000.0 # Hz
