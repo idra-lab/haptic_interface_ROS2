@@ -349,9 +349,6 @@ void HapticControlBase::control_thread() {
   x_tilde_new_ =
       enable_safety_sphere_ ? x_tilde_old_ + (x_new_ - x_old_) : x_new_;
 
-  // Apply feedback force
-  haptic_device_->update_target_wrench(wrench_buffer_.peek());
-
   // Compute errors
   Eigen::Vector3d position_error = compute_position_error();
   Eigen::Quaterniond orientation_error = compute_orientation_error();
@@ -421,6 +418,7 @@ void HapticControlBase::control_thread() {
   geometry_msgs::msg::TransformStamped ee_pose;
   get_ee_trans(ee_pose);
 
+  bool in_contact = false;
   if (use_fixtures_) {
     Eigen::Vector3d x_desired(target_pose_.pose.position.x,
                               target_pose_.pose.position.y,
@@ -429,7 +427,9 @@ void HapticControlBase::control_thread() {
     target_pose_vf_.header.stamp = this->get_clock()->now();
     target_pose_vf_.header.frame_id = base_link_name_;
     // // Apply virtual fixture constraints to position
-    Eigen::Vector3d x_filtered = vf_enforcer_->enforce_vf(x_desired);
+    auto [x_filtered, overlay_wrench] = vf_enforcer_->enforce_vf(x_desired);
+    // Apply feedback vibration if in contact with a virtual fixture
+    utils::sum_wrenches(wrench_buffer_[wrench_buffer_.size() - 1].wrench, overlay_wrench);
     target_pose_vf_.pose.position = eigenToRosPoint(x_filtered);
     target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
   }
@@ -470,6 +470,8 @@ void HapticControlBase::control_thread() {
         eigenFromRosPoint(target_pose_buffer_.peek().pose.position),
         tool_vis_radius_);
   }
+  // Update the exerted wrench on the haptic device
+  haptic_device_->update_target_wrench(wrench_buffer_.peek());
 
   // tf_broadcaster_->sendTransform(target_pose_tf_);
 

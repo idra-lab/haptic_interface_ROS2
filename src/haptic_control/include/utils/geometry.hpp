@@ -3,6 +3,7 @@
 #include <Eigen/Geometry>
 #include <cmath>
 #include <rclcpp/rclcpp.hpp>
+#include <geometry_msgs/msg/wrench.hpp>
 #include "colors.hpp"
 namespace utils {
 
@@ -73,5 +74,14 @@ std::vector<Eigen::Quaterniond> get_quaternions_from_rotmat_axis(
   auto ori_z = utils::quaternion_from_vector3(z_axis);
   return {ori_x, ori_y, ori_z};
 }
-}  // namespace utils
+void sum_wrenches(geometry_msgs::msg::Wrench& w1,
+                const geometry_msgs::msg::Wrench& w2) {
+  w1.force.x += w2.force.x;
+  w1.force.y += w2.force.y;
+  w1.force.z += w2.force.z;
+  w1.torque.x += w2.torque.x;
+  w1.torque.y += w2.torque.y;
+  w1.torque.z += w2.torque.z;
+}
+} // namespace utils
 #endif  // UTILS_GEOMETRY_HPP

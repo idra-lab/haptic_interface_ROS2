@@ -2,6 +2,7 @@
 #define VF_ENFORCER_HPP
 #include <omp.h>
 #include <Eigen/Core>
+#include <geometry_msgs/msg/wrench.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include "mesh_virtual_fixtures/mesh.hpp"
 #include "mesh_virtual_fixtures/vf_computation.hpp"
@@ -39,6 +40,10 @@ class VFEnforcer {
     lookup_area_ =
         node_->get_parameter("vf_parameters.lookup_area").as_double();
     plane_size_ = node_->get_parameter("vf_parameters.plane_size").as_double();
+
+    vf_pos_vibration_amplitude_ =
+        node_->get_parameter("vf_parameters.pos_vibration_amplitude")
+            .as_double();
 
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
     visualizer_ = visualizer;
@@ -117,9 +122,11 @@ class VFEnforcer {
                               tool_vis_radius_, plane_size_);
   }
 
-  Eigen::Vector3d enforce_vf(const Eigen::Vector3d& x_des) {
-    delta_x_ = compute_vf::enforce_virtual_fixture(
+  std::pair<Eigen::Vector3d, geometry_msgs::msg::Wrench> enforce_vf(
+      const Eigen::Vector3d& x_des) {
+    auto [delta_x, in_contact] = compute_vf::enforce_virtual_fixture(
         *mesh_, x_des, x_old_, tool_radius_, constraint_planes_, lookup_area_);
+    delta_x_ = delta_x;
     // slow down reference when close to the subject body
     bool slow_down_when_close_to_body_ = true;
     if (slow_down_when_close_to_body_) {
@@ -130,11 +137,11 @@ class VFEnforcer {
       if ((int)indices.size() > 0) {
         // Scale down the delta_x vector to reduce the speed
         // when the probe is close to the body
-        double step_size = std::min(delta_x_.norm(), 0.00002);
+        double step_size = std::min(delta_x_.norm(), 0.00003);
         delta_x_ = step_size * delta_x_.normalized();
-        RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
-                             "Slow down reference when close to body: %f",
-                             delta_x_.norm());
+        // RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+        //                      "Slow down reference when close to body: %f",
+        //                      delta_x_.norm());
       }
     }
     // integrate the dynamical system
@@ -149,7 +156,20 @@ class VFEnforcer {
     target_pose_vf.pose.orientation.w = 1.0;
     visualizer_->update_scene(constraint_planes_, x_des, x_new,
                               tool_vis_radius_, plane_size_);
-    return x_new;
+    geometry_msgs::msg::Wrench overlay_wrench;
+    double vibration_force_z = 0.0;
+    if (in_contact) {
+      vibration_force_z =
+          vf_pos_vibration_amplitude_ > 1e-6
+              ? vf_pos_vibration_amplitude_ *
+                    std::sin(2 * M_PI * 80 *
+                             node_->get_clock()->now().seconds())
+              : 0.0;
+    }
+    overlay_wrench.force.x = 0.0;
+    overlay_wrench.force.y = 0.0;
+    overlay_wrench.force.z = vibration_force_z;
+    return std::make_pair(x_new, overlay_wrench);
   }
 
   std::vector<Eigen::Vector3d> getCentroids(
@@ -169,7 +189,7 @@ class VFEnforcer {
     // Compute the normals of the nearest x triangles to x_new with KdTree
     std::vector<int> indices;
     std::vector<double> distances;
-    const double lookup_area_ = 0.6;
+    const double lookup_area_ = 0.3;
     skin_kdtree_.SearchRadius(x_old_, lookup_area_, indices, distances);
     if ((int)indices.size() < num_faces) {
       // not enough faces found
@@ -178,18 +198,29 @@ class VFEnforcer {
     Eigen::Vector3d n_avg = Eigen::Vector3d::Zero();
 
     int faces_idx;
+    Eigen::Vector3d normal, z_axis;
+    z_axis << 0.0, 0.0, 1.0;  // default x axis
     for (faces_idx = 0; faces_idx < (int)indices.size(); faces_idx++) {
       if (faces_idx > num_faces) {
         break;
       }
-      n_avg += skin_mesh_->triangle_normals_[indices[faces_idx]];
+      normal = skin_mesh_->triangle_normals_[indices[faces_idx]];
+      if (z_axis.dot(normal) < 0.0) {
+        // if the normal is pointing in the opposite direction of the x axis,
+        // flip it
+        RCLCPP_INFO_STREAM(
+            rclcpp::get_logger("rclcpp"),
+            "Flipping normal " << faces_idx << ": " << normal.transpose());
+        normal *= -1.0;
+      }
+      n_avg += normal;
     }
     // average normals
     n_avg /= faces_idx;
     // normalize and invert sign since face normals point outwards
     n_avg = -n_avg.normalized();
     Eigen::Matrix3d rotmat = rotationMatrixFromVectorZ(n_avg);
-    Eigen::Vector3d z_axis = rotmat.col(2);
+    z_axis = rotmat.col(2);
     // pick the x axis of the rotmat as the projection of the ribs axis on the
     // plane defined by z axis
     Eigen::Vector3d x_axis = projectOntoPlane(ribs_lateral_extension_, z_axis);
@@ -256,6 +287,7 @@ class VFEnforcer {
   int client__id_;
   int ctr_;
   double tool_radius_, tool_vis_radius_, lookup_area_;
+  double vf_pos_vibration_amplitude_;
   Eigen::Vector3d x_old_, delta_x_;
   Eigen::Quaterniond q_opt_, q_ref_old_;
   Eigen::Matrix4d skin_mesh_transform_;

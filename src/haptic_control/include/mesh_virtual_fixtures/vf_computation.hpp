@@ -20,7 +20,7 @@ inline bool almost_equal(const Eigen::Matrix<Scalar, 3, 1> &vec1,
   return ((angle <= tolerance) && axisalmost_equal);
 }
 
-Eigen::Vector3d enforce_virtual_fixture(
+std::pair<Eigen::Vector3d, bool> enforce_virtual_fixture(
     Mesh &mesh, const Eigen::Vector3d &target_position,
     const Eigen::Vector3d &current_position, const double radius,
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> &constraint_planes,
@@ -200,8 +200,8 @@ Eigen::Vector3d enforce_virtual_fixture(
   double step_size = std::min(direction.norm(), radius / 10);
   // }
   if (n_constraints == 0) {
-    return direction.normalized() * 0.00016;
-  }else{
+    return std::make_pair(direction.normalized() * 0.00016, false);
+  } else {
     delta_x_des = direction.normalized() * step_size;
   }
 
@@ -228,12 +228,12 @@ Eigen::Vector3d enforce_virtual_fixture(
   }
 
   // Assuming x is of dimension 3
-  const float max_delta = 0.00002;
+  const float max_delta = 0.00003;
   // adding constraint on max delta to avoid oscillations between two points
   real_t x_lb[3] = {-max_delta, -max_delta, -max_delta};  // lower bound
   real_t x_ub[3] = {max_delta, max_delta, max_delta};     // upper bound
   qpOASES::Options myOptions;
-  myOptions.printLevel = qpOASES::PL_LOW;
+  myOptions.printLevel = qpOASES::PL_NONE;
   qpOASES::QProblem min_problem(3, n_constraints,
                                 qpOASES::HessianType::HST_IDENTITY);
   min_problem.setOptions(myOptions);
@@ -245,16 +245,16 @@ Eigen::Vector3d enforce_virtual_fixture(
   // catch no solution
   if (min_problem.isInitialised() == false) {
     std::cerr << "QP problem not initialized" << std::endl;
-    return Eigen::Vector3d::Zero();
+    return std::make_pair(Eigen::Vector3d::Zero(), true);
   }
   auto success = min_problem.getPrimalSolution(delta_x.data());
   if (success != qpOASES::SUCCESSFUL_RETURN) {
     std::cerr << "QP problem not solved" << std::endl;
-    return Eigen::Vector3d::Zero();
+    return std::make_pair(Eigen::Vector3d::Zero(), true);
   }
   // std::cout << "delta_x: " << delta_x << std::endl;
 
-  return delta_x.cast<double>();
+  return std::make_pair(delta_x.cast<double>(), true);
 }
 }  // namespace compute_vf
 #endif  // VF_COMPUTATION_HPP

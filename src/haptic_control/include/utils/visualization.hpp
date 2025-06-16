@@ -81,6 +81,8 @@ class Visualizer {
 
     marker_array_.markers = {skin_marker, vf_marker};
     publish_multiple(marker_array_);
+
+    marker_array_.markers.clear();
   }
 
   void draw_arrows(const std::vector<Eigen::Vector3d>& origins,
@@ -318,7 +320,7 @@ class Visualizer {
     marker.pose.orientation.w = orientation.w();
 
     static const int NUM_SEGMENTS = 32;  // more segments = smoother cone
-    const double height = 0.1;           // cone height
+    const double height = 0.05;           // cone height
     const double radius = height * std::tan(angle);  // base radius
 
     // Create cone tip point

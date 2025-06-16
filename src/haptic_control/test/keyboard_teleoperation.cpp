@@ -92,7 +92,7 @@ void KeyboardControl::readInput() {
               Eigen::AngleAxisd(euler_angles_[2], Eigen::Vector3d::UnitZ()))
               .normalized();
   if (use_vf_) {
-    x_tilde_new_ = vf_enforcer_->enforce_vf(x_new_);
+    // x_tilde_new_ = vf_enforcer_->enforce_vf(x_new_);
     auto q_opt = conic_cbf::cbfOrientFilter(q_init, q_old, q_new, thetas);
     q_old = q_opt;
   } else {
