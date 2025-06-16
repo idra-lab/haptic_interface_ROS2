@@ -42,8 +42,8 @@ https://ieeexplore.ieee.org/document/9341590/
 #include "system_interface.hpp"
 #include "utils/circular_buffer.hpp"
 #include "utils/conversions.hpp"
-#include "utils/visualization.hpp"
 #include "utils/geometry.hpp"
+#include "utils/visualization.hpp"
 
 class HapticControlBase : public rclcpp::Node {
  public:
@@ -63,7 +63,7 @@ class HapticControlBase : public rclcpp::Node {
   // Core control logic
   void control_thread();
   void update_current_ee_pos();
-  void get_ee_trans(geometry_msgs::msg::TransformStamped &trans);
+  void get_ee_transform(geometry_msgs::msg::TransformStamped &trans);
 
   // Utility functions
   void store_wrench(const geometry_msgs::msg::WrenchStamped &target_wrench);
@@ -73,6 +73,7 @@ class HapticControlBase : public rclcpp::Node {
   // Public pose and transform data
   geometry_msgs::msg::TransformStamped target_pose_tf_;
   geometry_msgs::msg::PoseStamped target_pose_, target_pose_vf_, current_pose_;
+  geometry_msgs::msg::TransformStamped ee_pose_;
 
   // Haptic control device node
   std::shared_ptr<SystemInterface> haptic_device_;

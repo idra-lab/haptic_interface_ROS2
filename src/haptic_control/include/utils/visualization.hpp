@@ -303,7 +303,7 @@ class Visualizer {
                  const std::vector<double> rgba = {1.0, 0.0, 0.0, 1.0}) {
     visualization_msgs::msg::Marker marker = base_marker_;
     marker.header.stamp = node_->now();
-    marker.ns = "cone";
+    marker.ns = "conic constraints";
     marker.id = id;
     marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
     marker.action = visualization_msgs::msg::Marker::ADD;
@@ -320,7 +320,7 @@ class Visualizer {
     marker.pose.orientation.w = orientation.w();
 
     static const int NUM_SEGMENTS = 32;  // more segments = smoother cone
-    const double height = 0.05;           // cone height
+    const double height = 0.07;           // cone height
     const double radius = height * std::tan(angle);  // base radius
 
     // Create cone tip point
@@ -355,6 +355,16 @@ class Visualizer {
     }
 
     marker_array_.markers.push_back(marker);
+  }
+  void destroy_cones(){
+    visualization_msgs::msg::Marker clear_marker;
+    clear_marker.header.stamp = node_->now();
+    clear_marker.header.frame_id = reference_frame_;
+    clear_marker.ns = "conic constraints";
+    clear_marker.action = visualization_msgs::msg::Marker::DELETEALL;
+    marker_array_.markers.push_back(clear_marker);
+    marker_pub_->publish(marker_array_);
+    marker_array_.markers.clear();
   }
 };
 

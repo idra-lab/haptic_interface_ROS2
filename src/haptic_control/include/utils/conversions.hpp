@@ -4,6 +4,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
 
+
 Eigen::Matrix3d rotationMatrixFromVectorZ(const Eigen::Vector3d& avg_normal) {
   // Ensure avg_normal is normalized
   Eigen::Vector3d z_new = avg_normal.normalized();
@@ -59,6 +60,7 @@ geometry_msgs::msg::Vector3 quaternionToEuler(const Eigen::Quaterniond& q) {
 Eigen::Vector3d eigenFromRosPoint(const geometry_msgs::msg::Point& point) {
   return Eigen::Vector3d(point.x, point.y, point.z);
 }
+
 geometry_msgs::msg::Point vector3_to_point(
     const geometry_msgs::msg::Vector3& vec) {
   geometry_msgs::msg::Point point;

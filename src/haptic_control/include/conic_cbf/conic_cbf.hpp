@@ -12,7 +12,8 @@ Eigen::Matrix3d skew(Eigen::Vector3d &omega) {
   return omega_skew;
 }
 double theta_from_matrix(Eigen::Matrix3d &R) {
-  return std::acos((R.trace() - 1) / 2);
+  double value = std::clamp((R.trace() - 1) / 2, -1.0, 1.0);
+  return std::acos(value);
 }
 // exponential map from vector omega
 Eigen::Matrix3d exp_map(Eigen::Vector3d &omega) {
@@ -27,7 +28,7 @@ Eigen::Matrix3d exp_map(Eigen::Vector3d &omega) {
 // logaritmic map from rotation matrix
 Eigen::Vector3d log_map(Eigen::Matrix3d &R) {
   double theta = theta_from_matrix(R);
-  if (theta == 0) {
+  if (theta < 1e-6) {
     return Eigen::Vector3d::Zero();
   }
   Eigen::Matrix3d log_R = theta / (2 * std::sin(theta)) * (R - R.transpose());
@@ -105,7 +106,7 @@ Eigen::Quaterniond cbfOrientFilter(const Eigen::Quaterniond &q_ref,
 
   Eigen::Vector3d omega_opt(u(0), u(1), u(2));
 
-  Eigen::Vector3d angle = omega_opt; // * dt;
+  Eigen::Vector3d angle = omega_opt;  // * dt;
   // Eigen::Vector3d angle = omega; //* dt;
   Eigen::Matrix3d R_opt = R * exp_map(angle);
 

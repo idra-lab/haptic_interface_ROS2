@@ -171,9 +171,15 @@ class SystemInterface : public rclcpp::Node {
                                 old_force_.virtuose_force.force.z);
 
     // torque omitted for control simplicity
-    force_.virtuose_force.torque.x = 0.0;
-    force_.virtuose_force.torque.y = 0.0;
-    force_.virtuose_force.torque.z = 0.0;
+    force_.virtuose_force.torque.x = target_wrench_.wrench.torque.x;
+    // f_scale_ * filter_force(alpha_, ,
+    //                         old_force_.virtuose_force.torque.x);
+    force_.virtuose_force.torque.y = target_wrench_.wrench.torque.y;
+    // f_scale_ * filter_force(alpha_, target_wrench_.wrench.torque.y,
+    //                         old_force_.virtuose_force.torque.y);
+    force_.virtuose_force.torque.z = target_wrench_.wrench.torque.z;
+    // f_scale_ * filter_force(alpha_, target_wrench_.wrench.torque.z,
+    //                         old_force_.virtuose_force.torque.z);
 
     // SAFE ZONE FORCE
     force_.virtuose_force.force.x =
@@ -182,7 +188,12 @@ class SystemInterface : public rclcpp::Node {
         std::clamp(force_.virtuose_force.force.y, -f_max_, f_max_);
     force_.virtuose_force.force.z =
         std::clamp(force_.virtuose_force.force.z, -f_max_, f_max_);
-
+    force_.virtuose_force.torque.x =
+        std::clamp(force_.virtuose_force.torque.x, -f_max_ / 2.0, f_max_ / 2.0);
+    force_.virtuose_force.torque.y =
+        std::clamp(force_.virtuose_force.torque.y, -f_max_ / 2.0, f_max_ / 2.0);
+    force_.virtuose_force.torque.z =
+        std::clamp(force_.virtuose_force.torque.z, -f_max_ / 2.0, f_max_ / 2.0);
     // updating old force
     old_force_ = force_;
 

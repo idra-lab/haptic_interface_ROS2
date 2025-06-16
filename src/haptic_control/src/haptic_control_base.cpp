@@ -188,7 +188,7 @@ void HapticControlBase::store_wrench(
   wrench_buffer_.push(current_wrench_);
 }
 
-void HapticControlBase::get_ee_trans(
+void HapticControlBase::get_ee_transform(
     geometry_msgs::msg::TransformStamped &trans) {
   try {
     trans = tf_buffer_->lookupTransform(base_link_name_, tool_link_name_,
@@ -203,17 +203,16 @@ void HapticControlBase::get_ee_trans(
 
 void HapticControlBase::initialize_haptic_control() {
   received_ee_pose_ = false;
-  geometry_msgs::msg::TransformStamped trans;
 
   // Wait until end-effector pose is received
   while (!received_ee_pose_ && rclcpp::ok()) {
-    get_ee_trans(trans);
+    get_ee_transform(ee_pose_);
   }
 
   // Convert transform to position and orientation
   ee_starting_position.pose.position =
-      vector3_to_point(trans.transform.translation);
-  ee_starting_position.pose.orientation = trans.transform.rotation;
+      vector3_to_point(ee_pose_.transform.translation);
+  ee_starting_position.pose.orientation = ee_pose_.transform.rotation;
 
   // Safety sphere check
   if (enable_safety_sphere_) {
@@ -369,12 +368,6 @@ void HapticControlBase::control_thread() {
   target_pose_tf_.transform.translation =
       point_to_vector3(target_pose_.pose.position);
 
-  // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-  //                      "Target_position: %f %f %f",
-  //                      target_pose_.pose.position.x,
-  //                       target_pose_.pose.position.y,
-  //                       target_pose_.pose.position.z);
-
   // Apply delta rotation
   Eigen::Quaterniond target_orientation = orientation_error * qEEStart_;
   target_orientation.normalize();
@@ -415,10 +408,12 @@ void HapticControlBase::control_thread() {
   target_pose_buffer_.push(target_pose_);
 
   // Retrieve end-effector pose
-  geometry_msgs::msg::TransformStamped ee_pose;
-  get_ee_trans(ee_pose);
+  get_ee_transform(ee_pose_);
 
-  bool in_contact = false;
+  // Nullify the torque component of the f/t sensor since it will be used for
+  // orientation feedback
+  wrench_buffer_[0].wrench.torque.x = wrench_buffer_[0].wrench.torque.y =
+      wrench_buffer_[0].wrench.torque.z = 0.0;
   if (use_fixtures_) {
     Eigen::Vector3d x_desired(target_pose_.pose.position.x,
                               target_pose_.pose.position.y,
@@ -427,35 +422,48 @@ void HapticControlBase::control_thread() {
     target_pose_vf_.header.stamp = this->get_clock()->now();
     target_pose_vf_.header.frame_id = base_link_name_;
     // // Apply virtual fixture constraints to position
-    auto [x_filtered, overlay_wrench] = vf_enforcer_->enforce_vf(x_desired);
-    // Apply feedback vibration if in contact with a virtual fixture
-    utils::sum_wrenches(wrench_buffer_[wrench_buffer_.size() - 1].wrench, overlay_wrench);
+    auto [x_filtered, force_overlay] =
+        vf_enforcer_->enforce_position_constraints(x_desired);
+
     target_pose_vf_.pose.position = eigenToRosPoint(x_filtered);
     target_pose_vf_.pose.orientation = target_pose_.pose.orientation;
-  }
-  if (use_fixtures_ && use_ccbf_) {
-    // // Apply virtual fixture constraints to orientation
-    //*
-    // q_new_ = target_orientation;
-    // auto q_opt = conic_cbf::cbfOrientFilter(q_ref_, q_old_, q_new_, thetas_);
-    // q_old_ = q_opt;
-    //*
 
-    auto q_opt = vf_enforcer_->enforce_orientation_constraints(
-        target_orientation, q_old_, thetas_);
-    q_old_ = q_opt;
+    geometry_msgs::msg::Wrench wrench_overlay;
+    wrench_overlay.force = force_overlay;
+    wrench_overlay.torque.x = 0.0;
+    wrench_overlay.torque.y = 0.0;
+    wrench_overlay.torque.z = 0.0;
+    if (use_ccbf_) {
+      // // Apply virtual fixture constraints to orientation
+      //*
+      // q_new_ = target_orientation;
+      // auto q_opt = conic_cbf::cbfOrientFilter(q_ref_, q_old_, q_new_,
+      // thetas_); q_old_ = q_opt;
+      //*
+      Eigen::Vector3d measured_position(ee_pose_.transform.translation.x,
+                                        ee_pose_.transform.translation.y,
+                                        ee_pose_.transform.translation.z);
+      auto [q_opt, torque_overlay] =
+          vf_enforcer_->enforce_orientation_constraints(
+              measured_position, target_orientation, q_old_, thetas_);
+      q_old_ = q_opt;
+      wrench_overlay.torque = torque_overlay;
 
-    target_pose_vf_.pose.orientation = eigenToRosQuat(q_opt);
-    target_pose_tf_.transform.rotation = target_pose_vf_.pose.orientation;
+      target_pose_vf_.pose.orientation = eigenToRosQuat(q_opt);
+      target_pose_tf_.transform.rotation = target_pose_vf_.pose.orientation;
+    }
+
+    // Apply feedback vibration and torque when constraints are active
+    utils::sum_wrenches(wrench_buffer_[0].wrench, wrench_overlay);
   }
   target_pose_vf_buffer_.push(target_pose_vf_);
 
   // Publish current end-effector pose
   geometry_msgs::msg::PoseStamped ee_pose_msg;
-  ee_pose_msg.header.stamp = ee_pose.header.stamp;
+  ee_pose_msg.header.stamp = ee_pose_.header.stamp;
   ee_pose_msg.header.frame_id = base_link_name_;
-  ee_pose_msg.pose.position = vector3_to_point(ee_pose.transform.translation);
-  ee_pose_msg.pose.orientation = ee_pose.transform.rotation;
+  ee_pose_msg.pose.position = vector3_to_point(ee_pose_.transform.translation);
+  ee_pose_msg.pose.orientation = ee_pose_.transform.rotation;
   current_frame_pub_->publish(ee_pose_msg);
   // current_frame_pub_->publish(ee_current_pose_);
 

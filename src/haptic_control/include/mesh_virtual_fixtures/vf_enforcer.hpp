@@ -5,7 +5,7 @@
 #include <geometry_msgs/msg/wrench.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include "mesh_virtual_fixtures/mesh.hpp"
-#include "mesh_virtual_fixtures/vf_computation.hpp"
+#include "mesh_virtual_fixtures/mesh_vf_computation.hpp"
 #include "utils/conversions.hpp"
 #include "utils/geometry.hpp"
 #include "utils/json.hpp"
@@ -44,6 +44,8 @@ class VFEnforcer {
     vf_pos_vibration_amplitude_ =
         node_->get_parameter("vf_parameters.pos_vibration_amplitude")
             .as_double();
+    vf_ori_force_gain_ =
+        node_->get_parameter("vf_parameters.ori_force_gain").as_double();
 
     auto o3d_mesh = std::make_shared<open3d::geometry::TriangleMesh>();
     visualizer_ = visualizer;
@@ -122,11 +124,12 @@ class VFEnforcer {
                               tool_vis_radius_, plane_size_);
   }
 
-  std::pair<Eigen::Vector3d, geometry_msgs::msg::Wrench> enforce_vf(
-      const Eigen::Vector3d& x_des) {
-    auto [delta_x, in_contact] = compute_vf::enforce_virtual_fixture(
+  std::pair<Eigen::Vector3d, geometry_msgs::msg::Vector3>
+  enforce_position_constraints(const Eigen::Vector3d& x_des) {
+    auto [delta_x, in_contact] = compute_vf::enforce_mesh_virtual_fixture(
         *mesh_, x_des, x_old_, tool_radius_, constraint_planes_, lookup_area_);
     delta_x_ = delta_x;
+    x_des_ = x_des;
     // slow down reference when close to the subject body
     bool slow_down_when_close_to_body_ = true;
     if (slow_down_when_close_to_body_) {
@@ -156,7 +159,7 @@ class VFEnforcer {
     target_pose_vf.pose.orientation.w = 1.0;
     visualizer_->update_scene(constraint_planes_, x_des, x_new,
                               tool_vis_radius_, plane_size_);
-    geometry_msgs::msg::Wrench overlay_wrench;
+    geometry_msgs::msg::Vector3 force_overlay;
     double vibration_force_z = 0.0;
     if (in_contact) {
       vibration_force_z =
@@ -165,11 +168,14 @@ class VFEnforcer {
                     std::sin(2 * M_PI * 80 *
                              node_->get_clock()->now().seconds())
               : 0.0;
+      RCLCPP_INFO_STREAM(node_->get_logger(),
+                         "In contact with virtual fixture, applying vibration "
+                         "force: " << vibration_force_z);
     }
-    overlay_wrench.force.x = 0.0;
-    overlay_wrench.force.y = 0.0;
-    overlay_wrench.force.z = vibration_force_z;
-    return std::make_pair(x_new, overlay_wrench);
+    force_overlay.x = 0.0;
+    force_overlay.y = 0.0;
+    force_overlay.z = vibration_force_z;
+    return std::make_pair(x_new, force_overlay);
   }
 
   std::vector<Eigen::Vector3d> getCentroids(
@@ -185,12 +191,14 @@ class VFEnforcer {
     return centroids;
   }
 
-  bool computeQRef(Eigen::Quaterniond& q_ref, int num_faces) {
-    // Compute the normals of the nearest x triangles to x_new with KdTree
+  bool computeQRef(Eigen::Vector3d& measured_position,
+                   Eigen::Quaterniond& q_ref, int num_faces) {
+    // Compute the normals of the nearest x triangles to the current ee position
     std::vector<int> indices;
     std::vector<double> distances;
-    const double lookup_area_ = 0.3;
-    skin_kdtree_.SearchRadius(x_old_, lookup_area_, indices, distances);
+    const double lookup_area_ = 0.35;
+    skin_kdtree_.SearchRadius(measured_position, lookup_area_, indices,
+                              distances);
     if ((int)indices.size() < num_faces) {
       // not enough faces found
       return false;
@@ -239,35 +247,58 @@ class VFEnforcer {
     Eigen::Vector3d n = plane_normal.normalized();
     return v - (v.dot(n)) * n;
   }
-  Eigen::Quaterniond enforce_orientation_constraints(
-      Eigen::Quaterniond& target_orientation, Eigen::Quaterniond& q_old,
-      Eigen::Vector3d& thetas) {
+  std::pair<Eigen::Quaterniond, geometry_msgs::msg::Vector3>
+  enforce_orientation_constraints(Eigen::Vector3d& measured_position,
+                                  Eigen::Quaterniond& commanded_orientation,
+                                  Eigen::Quaterniond& q_old,
+                                  Eigen::Vector3d& thetas) {
     if (first_time_) {
-      q_ref_old_ = target_orientation;  // q_ref;
+      q_ref_old_ = commanded_orientation;  // q_ref;
       first_time_ = false;
     }
     Eigen::Quaterniond q_ref;
-    bool succes = computeQRef(q_ref, 30);
+    geometry_msgs::msg::Vector3 torque_overlay;
+    torque_overlay.x = 0.0;
+    torque_overlay.y = 0.0;
+    torque_overlay.z = 0.0;
+    bool succes = computeQRef(measured_position, q_ref, 30);
     if (!succes) {
       // not enough faces found, do not filter
-      return target_orientation;
+      return std::make_pair(commanded_orientation, torque_overlay);
     }
     // Slerp towards the new q_ref
     q_ref = q_ref_old_.slerp(0.1, q_ref);
     bool draw_cones = true;
-    if (draw_cones) {
-      auto axis = utils::get_quaternions_from_rotmat_axis(q_ref);
-      visualizer_->draw_cone(x_old_, axis[0], thetas(0), 0,
-                             utils::colors::COLOR_RED);
-      visualizer_->draw_cone(x_old_, axis[1], thetas(1), 1,
-                             utils::colors::COLOR_GREEN);
-      visualizer_->draw_cone(x_old_, axis[2], thetas(2), 2,
-                             utils::colors::COLOR_BLUE);
-    }
     q_ref_old_ = q_ref;
     q_opt_ =
-        conic_cbf::cbfOrientFilter(q_ref, q_old, target_orientation, thetas);
-    return q_opt_;
+    conic_cbf::cbfOrientFilter(q_ref, q_old, commanded_orientation, thetas);
+    
+    Eigen::Quaterniond q_delta = q_opt_ * commanded_orientation.inverse();
+    
+    // Always take the shortest rotation
+    if (q_delta.w() < 0.0) {
+      q_delta.coeffs() *= -1.0;
+    }
+    
+    Eigen::AngleAxisd angle_axis(q_delta);
+    Eigen::Vector3d omega_feedback = angle_axis.angle() * angle_axis.axis();
+    // Eigen::Vector3d omega_feedback = conic_cbf::log_map(delta_R);
+    
+    torque_overlay.x = vf_ori_force_gain_ * omega_feedback[0];
+    torque_overlay.y = vf_ori_force_gain_ * omega_feedback[1];
+    torque_overlay.z = vf_ori_force_gain_ * omega_feedback[2];
+    if (draw_cones && omega_feedback.norm() > 1e-2) {
+      auto axis = utils::get_quaternions_from_rotmat_axis(q_ref);
+      visualizer_->draw_cone(x_des_, axis[0], thetas(0), 0,
+                             utils::colors::COLOR_RED);
+      visualizer_->draw_cone(x_des_, axis[1], thetas(1), 1,
+                             utils::colors::COLOR_GREEN);
+      visualizer_->draw_cone(x_des_, axis[2], thetas(2), 2,
+                             utils::colors::COLOR_BLUE);
+    }else{
+      visualizer_->destroy_cones();
+    }
+    return std::make_pair(q_opt_, torque_overlay);
   }
 
   // private:
@@ -287,11 +318,12 @@ class VFEnforcer {
   int client__id_;
   int ctr_;
   double tool_radius_, tool_vis_radius_, lookup_area_;
-  double vf_pos_vibration_amplitude_;
+  double vf_pos_vibration_amplitude_, vf_ori_force_gain_;
   Eigen::Vector3d x_old_, delta_x_;
   Eigen::Quaterniond q_opt_, q_ref_old_;
   Eigen::Matrix4d skin_mesh_transform_;
   Eigen::Vector3d ribs_lateral_extension_;
+  Eigen::Vector3d x_des_;
   bool first_time_ = true;
 };
 

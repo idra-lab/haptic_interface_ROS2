@@ -20,7 +20,7 @@ inline bool almost_equal(const Eigen::Matrix<Scalar, 3, 1> &vec1,
   return ((angle <= tolerance) && axisalmost_equal);
 }
 
-std::pair<Eigen::Vector3d, bool> enforce_virtual_fixture(
+std::pair<Eigen::Vector3d, bool> enforce_mesh_virtual_fixture(
     Mesh &mesh, const Eigen::Vector3d &target_position,
     const Eigen::Vector3d &current_position, const double radius,
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> &constraint_planes,
